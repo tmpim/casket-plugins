@@ -93,6 +93,7 @@ func parseRules(c *casket.Controller) ([]domainRule, bool, []string, error) {
 
 	for c.Next() {
 		args := c.RemainingArgs()
+		log.Println("chuieauth: confusion:", args, c.ServerBlockKeys)
 
 		if len(args) < 1 && len(domainRules) == 0 {
 			return parseConfigBlock(c)
@@ -133,6 +134,7 @@ func parseConfigBlock(c *casket.Controller) ([]domainRule,
 	databaseKey := ""
 
 	for c.NextBlock() {
+		log.Println("chuieauth: parsing more:", c.Val())
 		matchingBlock = true
 		switch c.Val() {
 		case "database_host":
@@ -147,6 +149,7 @@ func parseConfigBlock(c *casket.Controller) ([]domainRule,
 	if len(databaseHost) > 0 {
 		var err error
 		for i := 0; i < 5; i++ {
+			log.Println("chuieauth: connecting to database...")
 			err := connectToDatabase(databaseHost, databaseKey)
 			if err != nil {
 				log.Println("chuieauth: database connection failed:", err)
