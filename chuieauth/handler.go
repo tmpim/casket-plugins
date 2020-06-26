@@ -154,6 +154,7 @@ func parseConfigBlock(c *casket.Controller) ([]domainRule,
 			}
 			time.Sleep(time.Second * 2)
 			if err == nil {
+				log.Println("chuieauth: database connected!")
 				break
 			}
 		}

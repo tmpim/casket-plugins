@@ -292,8 +292,7 @@ func connectToDatabase(host string, authKey string) error {
 	var err error
 	dbSession, err = rdb.Connect(rdb.ConnectOpts{
 		Address:  host,
-		Username: "admin",
-		AuthKey:  authKey,
+		Password: authKey,
 		Database: "chuieauth",
 		MaxIdle:  5,
 		MaxOpen:  5,
