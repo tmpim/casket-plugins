@@ -5,12 +5,13 @@ import (
 	"crypto/sha512"
 	"encoding/gob"
 	"errors"
-	rdb "github.com/dancannon/gorethink"
-	"github.com/gorilla/sessions"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"strings"
 	"time"
+
+	rdb "github.com/dancannon/gorethink"
+	"github.com/gorilla/sessions"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type databaseUser struct {
@@ -291,6 +292,7 @@ func connectToDatabase(host string, authKey string) error {
 	var err error
 	dbSession, err = rdb.Connect(rdb.ConnectOpts{
 		Address:  host,
+		Username: "admin",
 		AuthKey:  authKey,
 		Database: "chuieauth",
 		MaxIdle:  5,

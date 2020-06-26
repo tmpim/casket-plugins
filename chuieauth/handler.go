@@ -147,8 +147,7 @@ func parseConfigBlock(c *casket.Controller) ([]domainRule,
 	if len(databaseHost) > 0 {
 		var err error
 		for i := 0; i < 5; i++ {
-			log.Println("chuieauth: connecting to database:", databaseHost,
-				databaseKey)
+			log.Println("chuieauth: connecting to database...")
 			err := connectToDatabase(databaseHost, databaseKey)
 			if err != nil {
 				log.Println("chuieauth: database connection failed:", err)
