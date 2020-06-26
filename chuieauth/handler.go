@@ -63,7 +63,14 @@ func (c *ChuieAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int,
 	return c.authenticateSessionAndReturn(w, r, pathMatch.authId)
 }
 
-func Setup(c *casket.Controller) error {
+func init() {
+	casket.RegisterPlugin("chuieauth", casket.Plugin{
+		ServerType: "http",
+		Action:     setup,
+	})
+}
+
+func setup(c *casket.Controller) error {
 	domainRules, optional, exceptions, err := parseRules(c)
 	if err != nil {
 		return err
