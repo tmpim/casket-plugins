@@ -2,6 +2,7 @@ package chuieauth
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -147,6 +148,9 @@ func parseConfigBlock(c *casket.Controller) ([]domainRule,
 		var err error
 		for i := 0; i < 5; i++ {
 			err := connectToDatabase(databaseHost, databaseKey)
+			if err != nil {
+				log.Println("chuieauth: database connection failed:", err)
+			}
 			time.Sleep(time.Second * 2)
 			if err == nil {
 				break
