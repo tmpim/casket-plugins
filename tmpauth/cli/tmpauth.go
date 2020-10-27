@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -23,6 +26,52 @@ func main() {
 	}
 
 	switch os.Args[1] {
+	case "generate":
+		privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			log.Fatalln("failed to generate private key:", err)
+		}
+
+		mPriv, err := x509.MarshalPKCS8PrivateKey(privKey)
+		if err != nil {
+			log.Fatalln("failed to marshal private key:", err)
+		}
+
+		buf := new(bytes.Buffer)
+		err = pem.Encode(buf, &pem.Block{
+			Type:  "PRIVATE KEY",
+			Bytes: mPriv,
+		})
+		if err != nil {
+			log.Fatalln("failed to encode pem:", err)
+		}
+
+		fmt.Println("Your private key in PEM is:")
+		fmt.Println(buf.String())
+
+		pub := elliptic.Marshal(elliptic.P256(), privKey.X, privKey.Y)
+		priv := privKey.D.Bytes()
+
+		fmt.Println("Your private key in tmpauth minified format is:")
+		fmt.Println(base64.StdEncoding.EncodeToString(priv) + "." + base64.StdEncoding.EncodeToString(pub))
+		fmt.Println("\n#########################################################################\n")
+		fmt.Println("Your public key in PEM is:")
+
+		mPub, err := x509.MarshalPKIXPublicKey(&(privKey.PublicKey))
+		if err != nil {
+			log.Fatalln("failed to marshal public key:", err)
+		}
+
+		buf.Reset()
+		err = pem.Encode(buf, &pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: mPub,
+		})
+
+		fmt.Println(buf.String())
+
+		fmt.Println("Your Casket plugin (tmpauth minified) compatible public key is:")
+		fmt.Println(base64.StdEncoding.EncodeToString(pub))
 	case "convert":
 		data, err := ioutil.ReadAll(os.Stdin)
 		if err != nil {
@@ -85,11 +134,23 @@ func main() {
 			},
 		}
 
+		idBuf := make([]byte, 16)
+		_, err = rand.Read(idBuf)
+		if err != nil {
+			panic(err)
+		}
+
+		secretBuf := make([]byte, 32)
+		_, err = rand.Read(secretBuf)
+		if err != nil {
+			panic(err)
+		}
+
 		token, err := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-			"secret": "awduiafh8awrdf98aw8324",
-			"sub":    "e06804e0258f2075812d8f829eb0c9abebc4c380a6a70f3a12616a359ce44a11",
-			"iss":    "https://auth.tmpim.pw:central",
-			"aud":    "https://auth.tmpim.pw:server:key:e06804e0258f2075812d8f829eb0c9abebc4c380a6a70f3a12616a359ce44a11",
+			"secret": base64.StdEncoding.EncodeToString(secretBuf),
+			"sub":    hex.EncodeToString(idBuf),
+			"iss":    "auth.tmpim.pw:central",
+			"aud":    "auth.tmpim.pw:server:key:" + hex.EncodeToString(idBuf),
 		}).SignedString(privKey)
 		if err != nil {
 			panic(err)
@@ -101,8 +162,12 @@ func main() {
 
 var usage = `Usage: tmpauth <subcommand>
 Subcommands:
+	generate
+		generates a PEM private key and a minified tmpauth public key
 	convert
 		stdins a PEM encoded public or private key, stdouts it to minified tmpauth key format
 	create-secret
-		register a new client for debugging purposes using the private key specified by environment variable TMPAUTH_PRIVATE_KEY
+		creates a new server-secret token with a random ID and secret using the private key
+		specified by environment variable TMPAUTH_PRIVATE_KEY.
+		paste the token into https://jwt.io to inspect the claims/view the client ID and secret.
 `

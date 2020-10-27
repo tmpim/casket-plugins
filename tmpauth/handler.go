@@ -135,6 +135,8 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 
 	claims := state.Claims.(*stateClaims)
 
+	// TODO: MUST add a parameter to parse only, no caching.
+	// otherwise it could result in a state check skip!
 	token, err := t.parseAuthJWT(tokenStr)
 	if err != nil {
 		t.DebugLog("failed to verify callback token: %v", err)
@@ -186,7 +188,6 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 		RedirectURI: r.URL.RequestURI(),
 		StandardClaims: jwt.StandardClaims{
 			Id:        tokenID,
-			Audience:  TmpAuthEndpoint + ":server:state:" + t.Config.ClientID,
 			Issuer:    TmpAuthEndpoint + ":server:" + t.Config.ClientID,
 			IssuedAt:  now.Unix(),
 			NotBefore: now.Unix(),
@@ -198,6 +199,9 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 		return 500, errors.New("tmpauth: failed to start authentication")
 	}
 
+	// TODO: store redirect URIs somewhere
+	// if URI is <= 64 characters, it's OK to store in a cookie.
+	// cookie size limit is 4096. server-side storage might _have_ to be used.
 	http.SetCookie(w, &http.Cookie{
 		Name:     t.StateIDCookieName(tokenID),
 		Value:    tokenID,

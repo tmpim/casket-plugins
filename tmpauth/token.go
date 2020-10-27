@@ -95,6 +95,7 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
 		UserDescriptor: string(descriptor),
 		CachedHeaders:  make(map[string]string),
 		Expiry:         expiry,
+		StateID:        mapClaims["stateID"].(string), // TODO: do this better
 		headersMutex:   new(sync.RWMutex),
 	}
 
@@ -167,9 +168,6 @@ type stateClaims struct {
 }
 
 func (c *stateClaims) Valid() error {
-	if !c.VerifyAudience(TmpAuthEndpoint+":server:state:"+c.clientID, true) {
-		return fmt.Errorf("tmpauth: audience invalid, got: %v", c.Audience)
-	}
 	if !c.VerifyIssuer(TmpAuthEndpoint+":server:"+c.clientID, true) {
 		return fmt.Errorf("tmpauth: issuer invalid, got: %v\n", c.Issuer)
 	}
