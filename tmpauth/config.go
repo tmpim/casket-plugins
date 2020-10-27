@@ -119,8 +119,8 @@ type configClaims struct {
 }
 
 func (c *configClaims) Valid() error {
-	if len(c.Subject) != 64 {
-		return fmt.Errorf("tmpauth: subject length invalid, got: %v", len(c.clientID))
+	if c.Subject == "" {
+		return fmt.Errorf("tmpauth: subject cannot be empty")
 	}
 
 	if !c.VerifyIssuer(TmpAuthEndpoint+":central", true) {

@@ -13,19 +13,42 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
+type StatusResponse struct {
+	Tmpauth        bool            `json:"tmpauth"`
+	ClientID       string          `json:"clientID"`
+	IsLoggedIn     bool            `json:"isLoggedIn"`
+	UserDescriptor json.RawMessage `json:"loggedInUser,omitempty"`
+}
+
+func (t *Tmpauth) serveStatus(w http.ResponseWriter, r *http.Request, token *CachedToken) (int, error) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	resp := &StatusResponse{
+		Tmpauth:    true,
+		ClientID:   t.Config.ClientID,
+		IsLoggedIn: token != nil,
+	}
+
+	if token != nil {
+		resp.UserDescriptor = json.RawMessage(token.UserDescriptor)
+	}
+
+	json.NewEncoder(w).Encode(resp)
+
+	return 0, nil
+}
+
 func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
+	statusRequested := false
+
 	if strings.HasPrefix(r.URL.Path, "/.well-known/tmpauth/") {
 		switch strings.TrimPrefix(r.URL.Path, "/.well-known/tmpauth/") {
 		case "callback":
 			return t.authCallback(w, r)
-		case "ping":
-			w.Header().Set("Content-Type", "text/plain")
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"tmpauth":  true,
-				"clientID": t.Config.ClientID,
-			})
-			return 0, nil
+		case "status":
+			statusRequested = true
+			break
 		default:
 			return 400, fmt.Errorf("tmpauth: no such path")
 		}
@@ -78,13 +101,17 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 			})
 		}
 
+		if statusRequested {
+			return t.serveStatus(w, r, nil)
+		}
+
 		if authRequired {
 			return t.startAuth(w, r)
 		}
 	}
 
-	if cachedToken != nil {
-
+	if statusRequested {
+		return t.serveStatus(w, r, cachedToken)
 	}
 
 	// return t.authenticateSessionAndReturn(w, r, pathMatch.authId)

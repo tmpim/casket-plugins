@@ -9,7 +9,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"os"
+	"strings"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 func main() {
@@ -53,7 +57,45 @@ func main() {
 				log.Fatalln("unsupported PEM block type:", block.Type)
 			}
 		}
+	case "create-secret":
+		privateKey := os.Getenv("TMPAUTH_PRIVATE_KEY")
+		if privateKey == "" {
+			log.Fatalln("you must provide a tmpauth private key via env variable TMPAUTH_PRIVATE_KEY")
+		}
 
+		keyParts := strings.SplitN(privateKey, ".", 2)
+		priv, err := base64.StdEncoding.DecodeString(keyParts[0])
+		if err != nil {
+			panic(err)
+		}
+		pub, err := base64.StdEncoding.DecodeString(keyParts[1])
+		if err != nil {
+			panic(err)
+		}
+
+		privNum := new(big.Int).SetBytes(priv)
+		x, y := elliptic.Unmarshal(elliptic.P256(), pub)
+
+		privKey := &ecdsa.PrivateKey{
+			D: privNum,
+			PublicKey: ecdsa.PublicKey{
+				Curve: elliptic.P256(),
+				X:     x,
+				Y:     y,
+			},
+		}
+
+		token, err := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
+			"secret": "awduiafh8awrdf98aw8324",
+			"sub":    "e06804e0258f2075812d8f829eb0c9abebc4c380a6a70f3a12616a359ce44a11",
+			"iss":    "https://auth.tmpim.pw:central",
+			"aud":    "https://auth.tmpim.pw:server:key:e06804e0258f2075812d8f829eb0c9abebc4c380a6a70f3a12616a359ce44a11",
+		}).SignedString(privKey)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println(token)
 	}
 }
 
@@ -61,4 +103,6 @@ var usage = `Usage: tmpauth <subcommand>
 Subcommands:
 	convert
 		stdins a PEM encoded public or private key, stdouts it to minified tmpauth key format
+	create-secret
+		register a new client for debugging purposes using the private key specified by environment variable TMPAUTH_PRIVATE_KEY
 `
