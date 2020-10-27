@@ -286,7 +286,7 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 		"clientID": []string{t.Config.ClientID},
 	}
 
-	http.Redirect(w, r, "https://"+TmpAuthHost+"/auth/casket/login?"+queryParams.Encode(), http.StatusSeeOther)
+	http.Redirect(w, r, "https://"+TmpAuthHost+"/auth/tmpauth?"+queryParams.Encode(), http.StatusSeeOther)
 
 	return 0, nil
 }

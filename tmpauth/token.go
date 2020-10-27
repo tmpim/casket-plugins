@@ -60,7 +60,7 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string, doNotCache ...bool) (*CachedToke
 		return nil, fmt.Errorf("tmpauth: state ID missing from claims")
 	}
 
-	resp, err := t.HttpClient.Get("https://" + TmpAuthHost + "/auth/whomst?token=" + url.QueryEscape(tokenStr))
+	resp, err := t.HttpClient.Get("https://" + TmpAuthHost + "/whomst/tmpauth?token=" + url.QueryEscape(tokenStr))
 	if err != nil {
 		return nil, fmt.Errorf("tmpauth: failed to retrieve whomst data: %w", err)
 	}
