@@ -5,13 +5,15 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
+	"github.com/patrickmn/go-cache"
 	"github.com/tmpim/casket"
 	"github.com/tmpim/casket/caskethttp/httpserver"
 )
 
 const (
-	TmpAuthEndpoint = "https://auth.tmpim.pw"
+	TmpAuthHost = "auth.tmpim.pw"
 )
 
 type Tmpauth struct {
@@ -21,6 +23,8 @@ type Tmpauth struct {
 	TokenCache      map[[32]byte]*CachedToken
 	HttpClient      *http.Client
 	tokenCacheMutex *sync.Mutex
+
+	stateIDCache *cache.Cache
 }
 
 func init() {
@@ -51,6 +55,7 @@ func setup(c *casket.Controller) error {
 			},
 			TokenCache:      make(map[[32]byte]*CachedToken),
 			tokenCacheMutex: new(sync.Mutex),
+			stateIDCache:    cache.New(time.Minute*5, time.Minute),
 		}
 	}
 	cfg.AddMiddleware(mid)

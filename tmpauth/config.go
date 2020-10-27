@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -18,7 +17,6 @@ type Config struct {
 	ClientID     string
 	Secret       []byte
 	Token        string
-	Host         string
 	AllowedUsers []string
 	IDFormats    []string
 	Except       []string
@@ -123,11 +121,11 @@ func (c *configClaims) Valid() error {
 		return fmt.Errorf("tmpauth: subject cannot be empty")
 	}
 
-	if !c.VerifyIssuer(TmpAuthEndpoint+":central", true) {
+	if !c.VerifyIssuer(TmpAuthHost+":central", true) {
 		return fmt.Errorf("tmpauth: issuer invalid, got: %v", c.Issuer)
 	}
 
-	if !c.VerifyAudience(TmpAuthEndpoint+":server:key:"+c.Subject, true) {
+	if !c.VerifyAudience(TmpAuthHost+":server:key:"+c.Subject, true) {
 		return fmt.Errorf("tmpauth: audience invalid, got: %v", c.Audience)
 	}
 
@@ -172,11 +170,6 @@ func (c *configBlock) validate() (*Config, error) {
 		return nil, fmt.Errorf("tmpauth: both exclude and include cannot be specified at the same time")
 	}
 
-	u, err := url.Parse(TmpAuthEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("tmpauth: endpoint constant invalid: %w", err)
-	}
-
 	if claims.Secret == "" {
 		return nil, fmt.Errorf("tmpauth: secret cannot be empty")
 	}
@@ -186,7 +179,6 @@ func (c *configBlock) validate() (*Config, error) {
 		ClientID:     claims.Subject,
 		Token:        c.Token,
 		Secret:       []byte(claims.Secret),
-		Host:         u.Host,
 		Include:      c.Include,
 		Except:       c.Except,
 		AllowedUsers: c.AllowedUsers,

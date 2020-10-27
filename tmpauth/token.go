@@ -24,7 +24,7 @@ type CachedToken struct {
 	headersMutex   *sync.RWMutex
 }
 
-func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
+func (t *Tmpauth) parseAuthJWT(tokenStr string, doNotCache ...bool) (*CachedToken, error) {
 	t.DebugLog("parsing auth JWT: " + tokenStr)
 
 	tokenID := sha256.Sum256([]byte(tokenStr))
@@ -45,17 +45,22 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
 	}
 
 	mapClaims := token.Claims.(jwt.MapClaims)
-	if !mapClaims.VerifyAudience(TmpAuthEndpoint+":server:identity:"+t.Config.ClientID, true) {
+	if !mapClaims.VerifyAudience(TmpAuthHost+":server:identity:"+t.Config.ClientID, true) {
 		return nil, fmt.Errorf("tmpauth: invalid audience: %v", mapClaims["aud"])
 	}
-	if !mapClaims.VerifyIssuer(TmpAuthEndpoint+":central", true) {
+	if !mapClaims.VerifyIssuer(TmpAuthHost+":central", true) {
 		return nil, fmt.Errorf("tmpauth: issuer invalid, got: %v", mapClaims["iss"])
 	}
 	if !mapClaims.VerifyExpiresAt(time.Now().Unix(), false) {
 		return nil, fmt.Errorf("tmpauth: token expired")
 	}
 
-	resp, err := t.HttpClient.Get(TmpAuthEndpoint + "/auth/whomst?token=" + url.QueryEscape(tokenStr))
+	stateID, ok := mapClaims["stateID"].(string)
+	if !ok {
+		return nil, fmt.Errorf("tmpauth: state ID missing from claims")
+	}
+
+	resp, err := t.HttpClient.Get("https://" + TmpAuthHost + "/auth/whomst?token=" + url.QueryEscape(tokenStr))
 	if err != nil {
 		return nil, fmt.Errorf("tmpauth: failed to retrieve whomst data: %w", err)
 	}
@@ -95,7 +100,7 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
 		UserDescriptor: string(descriptor),
 		CachedHeaders:  make(map[string]string),
 		Expiry:         expiry,
-		StateID:        mapClaims["stateID"].(string), // TODO: do this better
+		StateID:        stateID,
 		headersMutex:   new(sync.RWMutex),
 	}
 
@@ -104,9 +109,11 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
 			getJSONPathMany(cachedToken.UserDescriptor, idFormat)...)
 	}
 
-	t.tokenCacheMutex.Lock()
-	t.TokenCache[tokenID] = cachedToken
-	t.tokenCacheMutex.Unlock()
+	if len(doNotCache) == 0 {
+		t.tokenCacheMutex.Lock()
+		t.TokenCache[tokenID] = cachedToken
+		t.tokenCacheMutex.Unlock()
+	}
 
 	return cachedToken, nil
 }
@@ -162,13 +169,13 @@ func generateTokenID() string {
 }
 
 type stateClaims struct {
-	RedirectURI string `json:"redirectURI"`
+	CallbackURL string `json:"callbackURL"`
 	clientID    string
 	jwt.StandardClaims
 }
 
 func (c *stateClaims) Valid() error {
-	if !c.VerifyIssuer(TmpAuthEndpoint+":server:"+c.clientID, true) {
+	if !c.VerifyIssuer(TmpAuthHost+":server:"+c.clientID, true) {
 		return fmt.Errorf("tmpauth: issuer invalid, got: %v\n", c.Issuer)
 	}
 	if !c.VerifyIssuedAt(time.Now().Unix(), true) || !c.VerifyExpiresAt(time.Now().Unix(), true) ||

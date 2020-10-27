@@ -10,7 +10,7 @@ type Transport struct {
 
 // RoundTrip implements round trips as required by http.RoundTrippr
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.URL.Host != t.config.Host {
+	if req.URL.Host != TmpAuthHost {
 		return t.base.RoundTrip(req)
 	}
 

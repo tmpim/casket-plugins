@@ -1,6 +1,7 @@
 package tmpauth
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -118,6 +119,54 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 	return 0, nil
 }
 
+func (t *Tmpauth) consumeStateID(r *http.Request, w http.ResponseWriter, stateID string) (string, error) {
+	stateCookie, err := r.Cookie(t.StateIDCookieName(stateID))
+
+	for _, cookie := range r.Cookies() {
+		if !strings.HasPrefix(cookie.Name, "__Host-tmpauth-stateid_") {
+			continue
+		}
+
+		cookie.Value = ""
+		cookie.Expires = time.Time{}
+		cookie.MaxAge = -1
+
+		http.SetCookie(w, cookie)
+	}
+
+	if err != nil || !isCookieSecure(stateCookie) {
+		return "", fmt.Errorf("tmpauth: state ID cookie not present")
+	}
+
+	value, err := url.PathUnescape(stateCookie.Value)
+	if err != nil {
+		return "", fmt.Errorf("tmpauth: state ID cookie invalid")
+	}
+
+	redirectURIRaw, found := t.stateIDCache.Get(stateID)
+	if found {
+		t.stateIDCache.Delete(stateID)
+	}
+
+	redirectURI := redirectURIRaw.(string)
+
+	if value == "ok" {
+		if !found {
+			return "", nil
+		}
+
+		return redirectURI, nil
+	} else if value[0] == '/' {
+		if !found || redirectURI == value {
+			return value, nil
+		}
+
+		return "", fmt.Errorf("tmpauth: state ID cookie mis-match")
+	}
+
+	return "", fmt.Errorf("tmpauth: state ID cookie invalid")
+}
+
 func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, error) {
 	params := r.URL.Query()
 
@@ -135,33 +184,28 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 
 	claims := state.Claims.(*stateClaims)
 
-	// TODO: MUST add a parameter to parse only, no caching.
-	// otherwise it could result in a state check skip!
-	token, err := t.parseAuthJWT(tokenStr)
+	token, err := t.parseAuthJWT(tokenStr, true)
 	if err != nil {
 		t.DebugLog("failed to verify callback token: %v", err)
 		return 400, fmt.Errorf("tmpauth: failed to verify callback token")
 	}
 
-	stateCookie, err := r.Cookie(t.StateIDCookieName(token.StateID))
-	if err != nil || !isCookieSecure(stateCookie) {
-		return 400, fmt.Errorf("tmpauth: failed to verify state ID")
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     t.StateIDCookieName(token.StateID),
-		Value:    "",
-		MaxAge:   -1,
-		Path:     "/",
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
-
 	if token.StateID != claims.Id {
 		t.DebugLog("failed to verify state ID: token(%v) != state(%v)", token.StateID, claims.Id)
 		return 400, fmt.Errorf("tmpauth: failed to verify callback token")
 	}
+
+	redirectURI, err := t.consumeStateID(r, w, token.StateID)
+	if err != nil {
+		t.DebugLog("failed to verify state ID against session: %v", err)
+		return 400, fmt.Errorf("tmpauth: failed to verify callback token")
+	}
+
+	// token validated, can cache now
+	tokenID := sha256.Sum256([]byte(tokenStr))
+	t.tokenCacheMutex.Lock()
+	t.TokenCache[tokenID] = token
+	t.tokenCacheMutex.Unlock()
 
 	t.DebugLog("auth callback successful, setting cookie")
 
@@ -175,7 +219,16 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 		SameSite: http.SameSiteStrictMode,
 	})
 
-	http.Redirect(w, r, claims.RedirectURI, http.StatusSeeOther)
+	if redirectURI == "" {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`you have been successfully authenticated, however we could ` +
+			`not tell what the original page was that you were trying to visit.` + "\n" +
+			`please try re-visiting the page you were trying to visit again`))
+		return 0, nil
+	}
+
+	http.Redirect(w, r, redirectURI, http.StatusSeeOther)
 	return 0, nil
 }
 
@@ -185,10 +238,11 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 	tokenID := generateTokenID()
 
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &stateClaims{
-		RedirectURI: r.URL.RequestURI(),
+		CallbackURL: "https://" + r.Host + "/.well-known/tmpauth/callback",
 		StandardClaims: jwt.StandardClaims{
 			Id:        tokenID,
-			Issuer:    TmpAuthEndpoint + ":server:" + t.Config.ClientID,
+			Issuer:    TmpAuthHost + ":server:" + t.Config.ClientID,
+			Audience:  TmpAuthHost + ":central:state",
 			IssuedAt:  now.Unix(),
 			NotBefore: now.Unix(),
 			ExpiresAt: expiry.Unix(),
@@ -199,25 +253,40 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 		return 500, errors.New("tmpauth: failed to start authentication")
 	}
 
-	// TODO: store redirect URIs somewhere
-	// if URI is <= 64 characters, it's OK to store in a cookie.
-	// cookie size limit is 4096. server-side storage might _have_ to be used.
-	http.SetCookie(w, &http.Cookie{
-		Name:     t.StateIDCookieName(tokenID),
-		Value:    tokenID,
-		Expires:  expiry,
-		Path:     "/",
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
+	requestURI := r.URL.RequestURI()
+
+	t.stateIDCache.SetDefault(tokenID, requestURI)
+
+	// store request URIs in cookies sometimes in case this is a distributed
+	// casket instance or something and it'll still work in most cases
+	if len(requestURI) <= 128 {
+		http.SetCookie(w, &http.Cookie{
+			Name:     t.StateIDCookieName(tokenID),
+			Value:    requestURI,
+			Expires:  expiry,
+			Path:     "/",
+			Secure:   true,
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+		})
+	} else {
+		http.SetCookie(w, &http.Cookie{
+			Name:     t.StateIDCookieName(tokenID),
+			Value:    "ok",
+			Expires:  expiry,
+			Path:     "/",
+			Secure:   true,
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+		})
+	}
 
 	queryParams := url.Values{
 		"state":    []string{token},
 		"clientID": []string{t.Config.ClientID},
 	}
 
-	http.Redirect(w, r, TmpAuthEndpoint+"/auth/casket/login?"+queryParams.Encode(), http.StatusSeeOther)
+	http.Redirect(w, r, "https://"+TmpAuthHost+"/auth/casket/login?"+queryParams.Encode(), http.StatusSeeOther)
 
 	return 0, nil
 }
