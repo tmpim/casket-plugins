@@ -2,7 +2,7 @@ package tmpauth
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -148,16 +148,16 @@ func (t *Tmpauth) SetHeaders(token *CachedToken, headers http.Header) error {
 }
 
 func generateTokenID() string {
-	buf := make([]byte, 32)
+	buf := make([]byte, 16)
 	n, err := rand.Read(buf)
 	if err != nil {
 		panic(err)
 	}
-	if n != 32 {
+	if n != 16 {
 		panic("tmpauth: generateTokenID: crypto/rand has failed")
 	}
 
-	return base64.StdEncoding.EncodeToString(buf)
+	return hex.EncodeToString(buf)
 }
 
 type stateClaims struct {
