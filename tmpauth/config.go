@@ -16,6 +16,7 @@ import (
 type Config struct {
 	PublicKey    *ecdsa.PublicKey
 	ClientID     string
+	Secret       []byte
 	Token        string
 	Host         string
 	AllowedUsers []string
@@ -43,7 +44,7 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 
 		var cfgBlock configBlock
 		cfgBlock.Headers = make(map[string]*HeaderOption)
-		cfgBlock.IDFormats = []string{"sub", "discord", "name"}
+		cfgBlock.IDFormats = []string{"token.sub", "whomst.discord", "whomst.name"}
 
 		for c.NextBlock() {
 			val := c.Val()
@@ -112,6 +113,7 @@ type configBlock struct {
 }
 
 type configClaims struct {
+	Secret   string `json:"secret"`
 	clientID []byte `json:"-"`
 	jwt.StandardClaims
 }
@@ -175,10 +177,15 @@ func (c *configBlock) validate() (*Config, error) {
 		return nil, fmt.Errorf("tmpauth: endpoint constant invalid: %w", err)
 	}
 
+	if claims.Secret == "" {
+		return nil, fmt.Errorf("tmpauth: secret cannot be empty")
+	}
+
 	return &Config{
 		PublicKey:    pubKey,
 		ClientID:     claims.Subject,
 		Token:        c.Token,
+		Secret:       []byte(claims.Secret),
 		Host:         u.Host,
 		Include:      c.Include,
 		Except:       c.Except,

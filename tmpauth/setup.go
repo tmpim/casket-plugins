@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 
 	"github.com/tmpim/casket"
 	"github.com/tmpim/casket/caskethttp/httpserver"
@@ -12,6 +13,15 @@ import (
 const (
 	TmpAuthEndpoint = "https://auth.tmpim.pw"
 )
+
+type Tmpauth struct {
+	Next            httpserver.Handler
+	Config          *Config
+	Logger          *log.Logger
+	TokenCache      map[[32]byte]*CachedToken
+	HttpClient      *http.Client
+	tokenCacheMutex *sync.Mutex
+}
 
 func init() {
 	casket.RegisterPlugin("tmpauth", casket.Plugin{
@@ -39,7 +49,8 @@ func setup(c *casket.Controller) error {
 					base:   http.DefaultTransport,
 				},
 			},
-			TokenCache: make(map[[32]byte]*CachedToken),
+			TokenCache:      make(map[[32]byte]*CachedToken),
+			tokenCacheMutex: new(sync.Mutex),
 		}
 	}
 	cfg.AddMiddleware(mid)
