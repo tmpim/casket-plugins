@@ -36,7 +36,7 @@ func main() {
 				}
 
 				ecKey := privKey.(*ecdsa.PrivateKey)
-				pub := elliptic.MarshalCompressed(elliptic.P256(), ecKey.X, ecKey.Y)
+				pub := elliptic.Marshal(elliptic.P256(), ecKey.X, ecKey.Y)
 				priv := ecKey.D.Bytes()
 				fmt.Println(base64.StdEncoding.EncodeToString(priv) + "." + base64.StdEncoding.EncodeToString(pub))
 			case "PUBLIC KEY":
@@ -46,7 +46,7 @@ func main() {
 				}
 
 				ecKey := pubKey.(*ecdsa.PublicKey)
-				pub := elliptic.MarshalCompressed(elliptic.P256(), ecKey.X, ecKey.Y)
+				pub := elliptic.Marshal(elliptic.P256(), ecKey.X, ecKey.Y)
 
 				fmt.Println(base64.StdEncoding.EncodeToString(pub))
 			default:

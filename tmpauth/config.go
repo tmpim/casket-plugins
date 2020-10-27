@@ -144,7 +144,7 @@ func (c *configBlock) validate() (*Config, error) {
 		return nil, fmt.Errorf("tmpauth: invalid public_key: %w", err)
 	}
 
-	x, y := elliptic.UnmarshalCompressed(elliptic.P256(), pubKeyData)
+	x, y := elliptic.Unmarshal(elliptic.P256(), pubKeyData)
 	if x == nil {
 		return nil, fmt.Errorf("tmpauth: invalid public_key")
 	}
