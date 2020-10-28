@@ -167,6 +167,8 @@ func (t *Tmpauth) consumeStateID(r *http.Request, w http.ResponseWriter, stateID
 	return "", fmt.Errorf("tmpauth: state ID cookie invalid")
 }
 
+var ErrInvalidCallbackToken = fmt.Errorf("tmpauth: failed to verify callback token")
+
 func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, error) {
 	params := r.URL.Query()
 
@@ -177,9 +179,12 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 	tokenStr := params.Get("token")
 	stateStr := params.Get("state")
 
-	state, err := jwt.ParseWithClaims(stateStr, &stateClaims{}, t.VerifyWithSecret)
+	state, err := jwt.ParseWithClaims(stateStr, &stateClaims{
+		clientID: t.Config.ClientID,
+	}, t.VerifyWithSecret)
 	if err != nil {
 		t.DebugLog("failed to verify state token: %v", err)
+		return 400, ErrInvalidCallbackToken
 	}
 
 	claims := state.Claims.(*stateClaims)
@@ -187,18 +192,18 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 	token, err := t.parseAuthJWT(tokenStr, true)
 	if err != nil {
 		t.DebugLog("failed to verify callback token: %v", err)
-		return 400, fmt.Errorf("tmpauth: failed to verify callback token")
+		return 400, ErrInvalidCallbackToken
 	}
 
 	if token.StateID != claims.Id {
 		t.DebugLog("failed to verify state ID: token(%v) != state(%v)", token.StateID, claims.Id)
-		return 400, fmt.Errorf("tmpauth: failed to verify callback token")
+		return 400, ErrInvalidCallbackToken
 	}
 
 	redirectURI, err := t.consumeStateID(r, w, token.StateID)
 	if err != nil {
 		t.DebugLog("failed to verify state ID against session: %v", err)
-		return 400, fmt.Errorf("tmpauth: failed to verify callback token")
+		return 400, ErrInvalidCallbackToken
 	}
 
 	// token validated, can cache now
