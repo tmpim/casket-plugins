@@ -115,8 +115,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 		return t.serveStatus(w, r, cachedToken)
 	}
 
-	// return t.authenticateSessionAndReturn(w, r, pathMatch.authId)
-	return 0, nil
+	return t.Next.ServeHTTP(w, r)
 }
 
 func (t *Tmpauth) consumeStateID(r *http.Request, w http.ResponseWriter, stateID string) (string, error) {
