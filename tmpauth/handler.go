@@ -131,14 +131,17 @@ func (t *Tmpauth) consumeStateID(r *http.Request, w http.ResponseWriter, stateID
 			cookie.Value = ""
 			cookie.Expires = time.Time{}
 			cookie.MaxAge = -1
+			cookie.HttpOnly = true
+			cookie.Secure = true
+			cookie.Path = "/"
+			cookie.SameSite = http.SameSiteStrictMode
 
 			http.SetCookie(w, cookie)
 		}
 	}()
 
 	stateCookie, err := r.Cookie(t.StateIDCookieName(stateID))
-
-	if err != nil || !isCookieSecure(stateCookie) {
+	if err != nil {
 		return "", fmt.Errorf("tmpauth: state ID cookie not present")
 	}
 
@@ -305,10 +308,6 @@ func (t *Tmpauth) authFromCookie(r *http.Request) (*CachedToken, error) {
 	cookie, err := r.Cookie(t.CookieName())
 	if err != nil {
 		return nil, err
-	}
-
-	if !isCookieSecure(cookie) {
-		return nil, errors.New("tmpauth: auth cookie is insecure")
 	}
 
 	return t.parseAuthJWT(cookie.Value)

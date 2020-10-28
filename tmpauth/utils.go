@@ -2,7 +2,6 @@ package tmpauth
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/tidwall/gjson"
@@ -14,11 +13,6 @@ func (t *Tmpauth) DebugLog(fmtString string, args ...interface{}) {
 	}
 
 	t.Logger.Output(2, fmt.Sprintf(fmtString, args...))
-}
-
-func isCookieSecure(cookie *http.Cookie) bool {
-	return cookie.HttpOnly && cookie.Domain != "" && cookie.Secure &&
-		cookie.SameSite == http.SameSiteStrictMode && cookie.Path == "/"
 }
 
 func getJSONPath(jsonData, path string) string {
