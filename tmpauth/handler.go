@@ -282,8 +282,8 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 	}
 
 	queryParams := url.Values{
-		"state":    []string{token},
-		"clientID": []string{t.Config.ClientID},
+		"state":     []string{token},
+		"client_id": []string{t.Config.ClientID},
 	}
 
 	http.Redirect(w, r, "https://"+TmpAuthHost+"/auth/tmpauth?"+queryParams.Encode(), http.StatusSeeOther)
