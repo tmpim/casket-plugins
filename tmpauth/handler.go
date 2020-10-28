@@ -120,19 +120,23 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 }
 
 func (t *Tmpauth) consumeStateID(r *http.Request, w http.ResponseWriter, stateID string) (string, error) {
-	stateCookie, err := r.Cookie(t.StateIDCookieName(stateID))
+	t.DebugLog("consuming state ID: %v", stateID)
 
-	for _, cookie := range r.Cookies() {
-		if !strings.HasPrefix(cookie.Name, "__Host-tmpauth-stateid_") {
-			continue
+	defer func() {
+		for _, cookie := range r.Cookies() {
+			if !strings.HasPrefix(cookie.Name, "__Host-tmpauth-stateid_") {
+				continue
+			}
+
+			cookie.Value = ""
+			cookie.Expires = time.Time{}
+			cookie.MaxAge = -1
+
+			http.SetCookie(w, cookie)
 		}
+	}()
 
-		cookie.Value = ""
-		cookie.Expires = time.Time{}
-		cookie.MaxAge = -1
-
-		http.SetCookie(w, cookie)
-	}
+	stateCookie, err := r.Cookie(t.StateIDCookieName(stateID))
 
 	if err != nil || !isCookieSecure(stateCookie) {
 		return "", fmt.Errorf("tmpauth: state ID cookie not present")
