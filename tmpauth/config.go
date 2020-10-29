@@ -182,6 +182,7 @@ func (c *configBlock) validate() (*Config, error) {
 		Include:      c.Include,
 		Except:       c.Except,
 		AllowedUsers: c.AllowedUsers,
+		IDFormats:    c.IDFormats,
 		Headers:      c.Headers,
 		Debug:        c.Debug,
 	}, nil
