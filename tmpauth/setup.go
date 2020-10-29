@@ -61,6 +61,7 @@ func setup(c *casket.Controller) error {
 			},
 			TokenCache:      make(map[[32]byte]*CachedToken),
 			HMAC:            hmac.New(sha1.New, config.Secret),
+			hmacMutex:       new(sync.Mutex),
 			tokenCacheMutex: new(sync.Mutex),
 			stateIDCache:    cache.New(time.Minute*5, time.Minute),
 		}
