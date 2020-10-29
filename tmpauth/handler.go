@@ -218,7 +218,7 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 
 	claims := state.Claims.(*stateClaims)
 
-	redirectURI, err := t.consumeStateID(r, w, claims.Subject)
+	redirectURI, err := t.consumeStateID(r, w, claims.Id)
 	if err != nil {
 		t.DebugLog("failed to verify state ID against session: %v", err)
 		return http.StatusBadRequest, ErrInvalidCallbackToken
