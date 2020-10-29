@@ -56,7 +56,8 @@ func (t *Tmpauth) CookieName() string {
 func (t *Tmpauth) StateIDCookieName(id string) string {
 	t.hmacMutex.Lock()
 	t.HMAC.Reset()
-	name := base64.RawURLEncoding.EncodeToString(t.HMAC.Sum([]byte(id)))
+	t.HMAC.Write([]byte(id))
+	name := base64.RawURLEncoding.EncodeToString(t.HMAC.Sum(nil))
 	t.hmacMutex.Unlock()
 
 	return "__Host-tmpauth-stateid_" + name

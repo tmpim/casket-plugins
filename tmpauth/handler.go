@@ -362,5 +362,5 @@ func (t *Tmpauth) authFromCookie(r *http.Request) (*CachedToken, error) {
 		return nil, err
 	}
 
-	return t.parseAuthJWT(cookie.Value)
+	return t.parseWrappedAuthJWT(cookie.Value)
 }
