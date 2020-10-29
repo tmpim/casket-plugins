@@ -51,7 +51,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 			statusRequested = true
 			break
 		default:
-			return 400, fmt.Errorf("tmpauth: no such path")
+			return http.StatusBadRequest, fmt.Errorf("tmpauth: no such path")
 		}
 	}
 
@@ -113,6 +113,29 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 
 	if statusRequested {
 		return t.serveStatus(w, r, cachedToken)
+	}
+
+	userAuthorized := false
+	if len(t.Config.AllowedUsers) > 0 {
+		t.DebugLog("checking if user is allowed on allowed users list: %v", cachedToken.UserIDs)
+		userIDs := make(map[string]bool)
+		for _, userID := range cachedToken.UserIDs {
+			userIDs[userID] = true
+		}
+
+		for _, allowedUser := range t.Config.AllowedUsers {
+			if userIDs[allowedUser] {
+				userAuthorized = true
+				break
+			}
+		}
+	} else {
+		userAuthorized = true
+	}
+
+	if !userAuthorized {
+		t.DebugLog("user not on allowed users list")
+		return http.StatusForbidden, fmt.Errorf("tmpauth: user not in allowed list")
 	}
 
 	return t.Next.ServeHTTP(w, r)
@@ -190,26 +213,31 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 	}, t.VerifyWithSecret)
 	if err != nil {
 		t.DebugLog("failed to verify state token: %v", err)
-		return 400, ErrInvalidCallbackToken
+		return http.StatusBadRequest, ErrInvalidCallbackToken
 	}
 
 	claims := state.Claims.(*stateClaims)
 
+	redirectURI, err := t.consumeStateID(r, w, claims.Subject)
+	if err != nil {
+		t.DebugLog("failed to verify state ID against session: %v", err)
+		return http.StatusBadRequest, ErrInvalidCallbackToken
+	}
+
+	if params.Get("error") == "cancelled" {
+		w.Header().Set("WWW-Authenticate", "tmpauth")
+		return http.StatusUnauthorized, fmt.Errorf("tmpauth: auth flow cancelled")
+	}
+
 	token, err := t.parseAuthJWT(tokenStr, true)
 	if err != nil {
 		t.DebugLog("failed to verify callback token: %v", err)
-		return 400, ErrInvalidCallbackToken
+		return http.StatusBadRequest, ErrInvalidCallbackToken
 	}
 
 	if token.StateID != claims.Id {
 		t.DebugLog("failed to verify state ID: token(%v) != state(%v)", token.StateID, claims.Id)
-		return 400, ErrInvalidCallbackToken
-	}
-
-	redirectURI, err := t.consumeStateID(r, w, token.StateID)
-	if err != nil {
-		t.DebugLog("failed to verify state ID against session: %v", err)
-		return 400, ErrInvalidCallbackToken
+		return http.StatusBadRequest, ErrInvalidCallbackToken
 	}
 
 	// token validated, can cache now
@@ -261,7 +289,7 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 	}).SignedString(t.Config.Secret)
 	if err != nil {
 		t.DebugLog("failed to sign state token: %v", err)
-		return 500, errors.New("tmpauth: failed to start authentication")
+		return http.StatusInternalServerError, errors.New("tmpauth: failed to start authentication")
 	}
 
 	requestURI := r.URL.RequestURI()
