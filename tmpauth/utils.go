@@ -1,6 +1,7 @@
 package tmpauth
 
 import (
+	"encoding/base64"
 	"fmt"
 
 	"github.com/dgrijalva/jwt-go"
@@ -53,7 +54,12 @@ func (t *Tmpauth) CookieName() string {
 }
 
 func (t *Tmpauth) StateIDCookieName(id string) string {
-	return "__Host-tmpauth-stateid_" + id
+	t.hmacMutex.Lock()
+	t.HMAC.Reset()
+	name := base64.RawURLEncoding.EncodeToString(t.HMAC.Sum([]byte(id)))
+	t.hmacMutex.Unlock()
+
+	return "__Host-tmpauth-stateid_" + name
 }
 
 func (t *Tmpauth) VerifyWithPublicKey(token *jwt.Token) (interface{}, error) {

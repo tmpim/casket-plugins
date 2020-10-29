@@ -1,6 +1,9 @@
 package tmpauth
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"hash"
 	"log"
 	"net/http"
 	"os"
@@ -17,12 +20,15 @@ const (
 )
 
 type Tmpauth struct {
-	Next            httpserver.Handler
-	Config          *Config
-	Logger          *log.Logger
-	TokenCache      map[[32]byte]*CachedToken
-	HttpClient      *http.Client
+	Next       httpserver.Handler
+	Config     *Config
+	Logger     *log.Logger
+	TokenCache map[[32]byte]*CachedToken
+	HttpClient *http.Client
+	HMAC       hash.Hash
+
 	tokenCacheMutex *sync.Mutex
+	hmacMutex       *sync.Mutex
 
 	stateIDCache *cache.Cache
 }
@@ -54,6 +60,7 @@ func setup(c *casket.Controller) error {
 				},
 			},
 			TokenCache:      make(map[[32]byte]*CachedToken),
+			HMAC:            hmac.New(sha1.New, config.Secret),
 			tokenCacheMutex: new(sync.Mutex),
 			stateIDCache:    cache.New(time.Minute*5, time.Minute),
 		}

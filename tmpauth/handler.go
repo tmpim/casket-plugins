@@ -235,7 +235,7 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 		return http.StatusUnauthorized, fmt.Errorf("tmpauth: auth flow cancelled")
 	}
 
-	token, err := t.parseAuthJWT(tokenStr, true)
+	token, err := t.parseAuthJWT(tokenStr)
 	if err != nil {
 		t.DebugLog("failed to verify callback token: %v", err)
 		return http.StatusBadRequest, ErrInvalidCallbackToken
@@ -246,8 +246,27 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 		return http.StatusBadRequest, ErrInvalidCallbackToken
 	}
 
+	expires := token.Expiry.Unix()
+	if expires < 60*60*24*366 {
+		expires = 0
+	}
+
+	wToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &wrappedToken{
+		Token: tokenStr,
+		StandardClaims: jwt.StandardClaims{
+			Audience:  TmpAuthHost + ":server:user_cookie:" + t.Config.ClientID,
+			Issuer:    TmpAuthHost + ":server:" + t.Config.ClientID,
+			IssuedAt:  time.Now().Unix(),
+			ExpiresAt: expires,
+		},
+	}).SignedString(t.Config.Secret)
+	if err != nil {
+		t.DebugLog("failed to sign wrapped token: %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("tmpauth: failed to sign wrapped token")
+	}
+
 	// token validated, can cache now
-	tokenID := sha256.Sum256([]byte(tokenStr))
+	tokenID := sha256.Sum256([]byte(wToken))
 	t.tokenCacheMutex.Lock()
 	t.TokenCache[tokenID] = token
 	t.tokenCacheMutex.Unlock()
@@ -256,7 +275,7 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     t.CookieName(),
-		Value:    tokenStr,
+		Value:    wToken,
 		Expires:  token.Expiry,
 		Path:     "/",
 		Secure:   true,

@@ -24,8 +24,26 @@ type CachedToken struct {
 	headersMutex   *sync.RWMutex
 }
 
-func (t *Tmpauth) parseAuthJWT(tokenStr string, doNotCache ...bool) (*CachedToken, error) {
-	t.DebugLog("parsing auth JWT: " + tokenStr)
+type wrappedToken struct {
+	Token    string `json:"token"`
+	clientID string `json:"-"`
+	jwt.StandardClaims
+}
+
+func (w *wrappedToken) Valid() error {
+	if !w.VerifyAudience(TmpAuthHost+":server:user_cookie:"+w.clientID, true) {
+		return fmt.Errorf("tmpauth: audience invalid, got: %v", w.Audience)
+	}
+
+	if !w.VerifyExpiresAt(time.Now().Unix(), false) {
+		return fmt.Errorf("tmpauth: token expired")
+	}
+
+	return nil
+}
+
+func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*CachedToken, error) {
+	t.DebugLog("parsing wrapped auth JWT")
 
 	tokenID := sha256.Sum256([]byte(tokenStr))
 	t.tokenCacheMutex.Lock()
@@ -38,6 +56,32 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string, doNotCache ...bool) (*CachedToke
 		return cachedToken, nil
 	}
 	t.tokenCacheMutex.Unlock()
+
+	wTokenRaw, err := jwt.ParseWithClaims(tokenStr, &wrappedToken{
+		clientID: t.Config.ClientID,
+	}, t.VerifyWithSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	wToken := wTokenRaw.Claims.(*wrappedToken)
+
+	cachedToken, err := t.parseAuthJWT(wToken.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(doNotCache) == 0 {
+		t.tokenCacheMutex.Lock()
+		t.TokenCache[tokenID] = cachedToken
+		t.tokenCacheMutex.Unlock()
+	}
+
+	return cachedToken, nil
+}
+
+func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
+	t.DebugLog("parsing auth JWT: " + tokenStr)
 
 	token, err := jwt.Parse(tokenStr, t.VerifyWithPublicKey)
 	if err != nil {
@@ -111,12 +155,6 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string, doNotCache ...bool) (*CachedToke
 	for _, idFormat := range t.Config.IDFormats {
 		cachedToken.UserIDs = append(cachedToken.UserIDs,
 			getJSONPathMany(cachedToken.UserDescriptor, idFormat)...)
-	}
-
-	if len(doNotCache) == 0 {
-		t.tokenCacheMutex.Lock()
-		t.TokenCache[tokenID] = cachedToken
-		t.tokenCacheMutex.Unlock()
 	}
 
 	return cachedToken, nil
