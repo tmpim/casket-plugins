@@ -133,7 +133,7 @@ func (t *Tmpauth) consumeStateID(r *http.Request, w http.ResponseWriter, stateID
 			cookie.HttpOnly = true
 			cookie.Secure = true
 			cookie.Path = "/"
-			cookie.SameSite = http.SameSiteStrictMode
+			cookie.SameSite = http.SameSiteLaxMode
 
 			http.SetCookie(w, cookie)
 		}
@@ -278,7 +278,7 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 			Path:     "/",
 			Secure:   true,
 			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
+			SameSite: http.SameSiteLaxMode,
 		})
 	} else {
 		http.SetCookie(w, &http.Cookie{
@@ -288,7 +288,7 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 			Path:     "/",
 			Secure:   true,
 			HttpOnly: true,
-			SameSite: http.SameSiteStrictMode,
+			SameSite: http.SameSiteLaxMode,
 		})
 	}
 
