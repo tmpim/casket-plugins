@@ -139,6 +139,7 @@ func (t *Tmpauth) SetHeaders(token *CachedToken, headers http.Header) error {
 				return fmt.Errorf("tmpauth: failed to evaluate required user claims field, turn on debugging for more details")
 			}
 
+			headers.Set(headerName, value)
 			headersToCache = append(headersToCache, [2]string{headerOption.Format, value})
 		}
 	}

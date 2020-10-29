@@ -109,6 +109,12 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 		if authRequired {
 			return t.startAuth(w, r)
 		}
+	} else if len(t.Config.Headers) > 0 {
+		err := t.SetHeaders(cachedToken, w.Header())
+		if err != nil {
+			t.DebugLog("failed to set headers: %v", err)
+			return http.StatusPreconditionRequired, fmt.Errorf("tmpauth: missing required header value")
+		}
 	}
 
 	if statusRequested {
