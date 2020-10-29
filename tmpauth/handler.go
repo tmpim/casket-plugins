@@ -178,12 +178,12 @@ func (t *Tmpauth) consumeStateID(r *http.Request, w http.ResponseWriter, stateID
 		return "", fmt.Errorf("tmpauth: state ID cookie invalid")
 	}
 
+	var redirectURI string
 	redirectURIRaw, found := t.stateIDCache.Get(stateID)
 	if found {
 		t.stateIDCache.Delete(stateID)
+		redirectURI = redirectURIRaw.(string)
 	}
-
-	redirectURI := redirectURIRaw.(string)
 
 	if value == "ok" {
 		if !found {
