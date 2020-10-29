@@ -104,6 +104,10 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string, doNotCache ...bool) (*CachedToke
 		headersMutex:   new(sync.RWMutex),
 	}
 
+	if len(t.Config.IDFormats) > 0 {
+		t.DebugLog("user descriptor: %v", cachedToken.UserDescriptor)
+	}
+
 	for _, idFormat := range t.Config.IDFormats {
 		cachedToken.UserIDs = append(cachedToken.UserIDs,
 			getJSONPathMany(cachedToken.UserDescriptor, idFormat)...)
