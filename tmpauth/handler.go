@@ -98,7 +98,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 				Path:     "/",
 				Secure:   true,
 				HttpOnly: true,
-				SameSite: http.SameSiteStrictMode,
+				SameSite: http.SameSiteLaxMode,
 			})
 		}
 
@@ -227,7 +227,7 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 		Path:     "/",
 		Secure:   true,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	if redirectURI == "" {
