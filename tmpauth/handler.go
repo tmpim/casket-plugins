@@ -43,8 +43,10 @@ func (t *Tmpauth) serveStatus(w http.ResponseWriter, r *http.Request, token *Cac
 func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
 	statusRequested := false
 
-	if strings.HasPrefix(r.URL.Path, "/.well-known/tmpauth/") {
-		switch strings.TrimPrefix(r.URL.Path, "/.well-known/tmpauth/") {
+	subpath := strings.TrimPrefix(r.URL.Host, t.Config.Host.Path)
+
+	if strings.HasPrefix(subpath, "/.well-known/tmpauth/") {
+		switch strings.TrimPrefix(subpath, "/.well-known/tmpauth/") {
 		case "callback":
 			return t.authCallback(w, r)
 		case "status":
@@ -302,7 +304,7 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 	tokenID := generateTokenID()
 
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &stateClaims{
-		CallbackURL: "https://" + r.Host + "/.well-known/tmpauth/callback",
+		CallbackURL: "https://" + t.Config.Host.Host + t.Config.Host.Path + "/.well-known/tmpauth/callback",
 		StandardClaims: jwt.StandardClaims{
 			Id:        tokenID,
 			Issuer:    TmpAuthHost + ":server:" + t.Config.ClientID,

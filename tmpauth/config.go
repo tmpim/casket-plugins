@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
@@ -22,6 +23,7 @@ type Config struct {
 	Except       []string
 	Include      []string
 	Headers      map[string]*HeaderOption
+	Host         *url.URL
 	Debug        bool
 }
 
@@ -89,6 +91,8 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 			}
 		}
 
+		cfgBlock.ServerBlockKey = c.Key
+
 		var err error
 		config, err = cfgBlock.validate()
 		if err != nil {
@@ -100,14 +104,15 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 }
 
 type configBlock struct {
-	PublicKey    string
-	Token        string
-	AllowedUsers []string
-	IDFormats    []string
-	Except       []string
-	Include      []string
-	Headers      map[string]*HeaderOption
-	Debug        bool
+	PublicKey      string
+	Token          string
+	AllowedUsers   []string
+	IDFormats      []string
+	Except         []string
+	Include        []string
+	Headers        map[string]*HeaderOption
+	ServerBlockKey string
+	Debug          bool
 }
 
 type configClaims struct {
@@ -174,6 +179,15 @@ func (c *configBlock) validate() (*Config, error) {
 		return nil, fmt.Errorf("tmpauth: secret cannot be empty")
 	}
 
+	u, err := url.Parse(c.ServerBlockKey)
+	if err != nil {
+		return nil, fmt.Errorf("tmpauth: failed to parse server block key: %w", err)
+	}
+
+	u.Scheme = "https"
+	u.RawPath = ""
+	strings.TrimSuffix(u.Path, "/")
+
 	return &Config{
 		PublicKey:    pubKey,
 		ClientID:     claims.Subject,
@@ -184,6 +198,7 @@ func (c *configBlock) validate() (*Config, error) {
 		AllowedUsers: c.AllowedUsers,
 		IDFormats:    c.IDFormats,
 		Headers:      c.Headers,
+		Host:         u,
 		Debug:        c.Debug,
 	}, nil
 }
