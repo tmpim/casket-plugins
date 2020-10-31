@@ -43,7 +43,7 @@ func (t *Tmpauth) serveStatus(w http.ResponseWriter, r *http.Request, token *Cac
 func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
 	statusRequested := false
 
-	subpath := strings.TrimPrefix(r.URL.Host, t.Config.Host.Path)
+	subpath := strings.TrimPrefix(r.URL.Path, t.Config.Host.Path)
 
 	if strings.HasPrefix(subpath, "/.well-known/tmpauth/") {
 		switch strings.TrimPrefix(subpath, "/.well-known/tmpauth/") {
