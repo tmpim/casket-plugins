@@ -186,7 +186,7 @@ func (c *configBlock) validate() (*Config, error) {
 
 	u.Scheme = "https"
 	u.RawPath = ""
-	strings.TrimSuffix(u.Path, "/")
+	u.Path = strings.TrimSuffix(u.Path, "/")
 
 	return &Config{
 		PublicKey:    pubKey,
