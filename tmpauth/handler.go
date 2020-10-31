@@ -43,10 +43,8 @@ func (t *Tmpauth) serveStatus(w http.ResponseWriter, r *http.Request, token *Cac
 func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
 	statusRequested := false
 
-	subpath := strings.TrimPrefix(r.URL.Path, t.Config.Host.Path)
-
-	if strings.HasPrefix(subpath, "/.well-known/tmpauth/") {
-		switch strings.TrimPrefix(subpath, "/.well-known/tmpauth/") {
+	if strings.HasPrefix(r.URL.Path, "/.well-known/tmpauth/") {
+		switch strings.TrimPrefix(r.URL.Path, "/.well-known/tmpauth/") {
 		case "callback":
 			return t.authCallback(w, r)
 		case "status":
@@ -292,6 +290,10 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 			`not tell what the original page was that you were trying to visit.` + "\n" +
 			`please try re-visiting the page you were trying to visit again`))
 		return 0, nil
+	}
+
+	if t.Config.Host.Path != "" {
+		redirectURI = path.Join(t.Config.Host.Path, redirectURI)
 	}
 
 	http.Redirect(w, r, redirectURI, http.StatusSeeOther)
