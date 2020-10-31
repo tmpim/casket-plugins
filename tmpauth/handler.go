@@ -293,6 +293,7 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 	}
 
 	if t.Config.Host.Path != "" {
+		t.DebugLog("using configured path: %v", t.Config.Host.Path)
 		redirectURI = path.Join(t.Config.Host.Path, redirectURI)
 	}
 
