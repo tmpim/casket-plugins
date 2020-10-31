@@ -179,6 +179,10 @@ func (c *configBlock) validate() (*Config, error) {
 		return nil, fmt.Errorf("tmpauth: secret cannot be empty")
 	}
 
+	if !strings.HasPrefix(c.ServerBlockKey, "http://") && !strings.HasPrefix(c.ServerBlockKey, "https://") {
+		c.ServerBlockKey = "https://" + c.ServerBlockKey
+	}
+
 	u, err := url.Parse(c.ServerBlockKey)
 	if err != nil {
 		return nil, fmt.Errorf("tmpauth: failed to parse server block key: %w", err)
