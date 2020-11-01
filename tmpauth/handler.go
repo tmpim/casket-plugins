@@ -173,7 +173,7 @@ func (t *Tmpauth) consumeStateID(r *http.Request, w http.ResponseWriter, stateID
 		return "", fmt.Errorf("tmpauth: state ID cookie not present")
 	}
 
-	value, err := url.PathUnescape(stateCookie.Value)
+	value, err := url.QueryUnescape(stateCookie.Value)
 	if err != nil {
 		return "", fmt.Errorf("tmpauth: state ID cookie invalid")
 	}
@@ -330,7 +330,7 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 	if len(requestURI) <= 128 {
 		http.SetCookie(w, &http.Cookie{
 			Name:     t.StateIDCookieName(tokenID),
-			Value:    requestURI,
+			Value:    url.QueryEscape(requestURI),
 			Expires:  expiry,
 			Path:     "/",
 			Secure:   true,
