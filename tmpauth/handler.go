@@ -361,6 +361,11 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 }
 
 func (t *Tmpauth) authFromCookie(r *http.Request) (*CachedToken, error) {
+	token := r.Header.Get("X-Tmpauth-Token")
+	if token != "" {
+		return t.parseWrappedAuthJWT(token)
+	}
+
 	cookie, err := r.Cookie(t.CookieName())
 	if err != nil {
 		return nil, err
