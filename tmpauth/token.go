@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -20,6 +19,7 @@ type CachedToken struct {
 	UserDescriptor string
 	CachedHeaders  map[string]string
 	Expiry         time.Time
+	RevalidateAt   time.Time
 	UserIDs        []string // IDs that can be used in Config.AllowedUsers from IDFormats
 	headersMutex   *sync.RWMutex
 }
@@ -49,11 +49,9 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 	t.tokenCacheMutex.Lock()
 	if cachedToken, found := t.TokenCache[tokenID]; found {
 		t.tokenCacheMutex.Unlock()
-		if cachedToken.Expiry.Before(time.Now()) {
-			return nil, errors.New("tmpauth: token expired")
+		if cachedToken.RevalidateAt.After(time.Now()) {
+			return cachedToken, nil
 		}
-
-		return cachedToken, nil
 	}
 	t.tokenCacheMutex.Unlock()
 
@@ -110,6 +108,7 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
 		return nil, fmt.Errorf("tmpauth: got non OK response when retrieving token: %v", resp.Status)
 	}
 
@@ -140,10 +139,16 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
 		return nil, fmt.Errorf("tmpauth: fatal error: failed to marshal user descriptor: %w", err)
 	}
 
+	revalidateAt := time.Now().Add(15 * time.Minute)
+	if revalidateAt.After(expiry) {
+		revalidateAt = expiry
+	}
+
 	cachedToken := &CachedToken{
 		UserDescriptor: string(descriptor),
 		CachedHeaders:  make(map[string]string),
 		Expiry:         expiry,
+		RevalidateAt:   revalidateAt,
 		StateID:        stateID,
 		headersMutex:   new(sync.RWMutex),
 	}

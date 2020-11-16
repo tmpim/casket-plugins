@@ -18,6 +18,7 @@ type Config struct {
 	ClientID     string
 	Secret       []byte
 	Token        string
+	Redirect     string
 	AllowedUsers []string
 	IDFormats    []string
 	Except       []string
@@ -74,6 +75,8 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 				cfgBlock.Include = args
 			case "debug":
 				cfgBlock.Debug = true
+			case "redirect":
+				cfgBlock.Redirect = args[0]
 			default:
 				headerName := strings.ToLower(val)
 				if !strings.HasPrefix(headerName, "x-") {
@@ -112,6 +115,7 @@ type configBlock struct {
 	Include        []string
 	Headers        map[string]*HeaderOption
 	ServerBlockKey string
+	Redirect       string
 	Debug          bool
 }
 
@@ -197,6 +201,7 @@ func (c *configBlock) validate() (*Config, error) {
 		ClientID:     claims.Subject,
 		Token:        c.Token,
 		Secret:       []byte(claims.Secret),
+		Redirect:     c.Redirect,
 		Include:      c.Include,
 		Except:       c.Except,
 		AllowedUsers: c.AllowedUsers,

@@ -27,10 +27,10 @@ type Tmpauth struct {
 	HttpClient *http.Client
 	HMAC       hash.Hash
 
+	stateIDCache    *cache.Cache
 	tokenCacheMutex *sync.Mutex
 	hmacMutex       *sync.Mutex
-
-	stateIDCache *cache.Cache
+	janitorOnce     *sync.Once
 }
 
 func init() {
@@ -64,6 +64,7 @@ func setup(c *casket.Controller) error {
 			hmacMutex:       new(sync.Mutex),
 			tokenCacheMutex: new(sync.Mutex),
 			stateIDCache:    cache.New(time.Minute*5, time.Minute),
+			janitorOnce:     new(sync.Once),
 		}
 	}
 	cfg.AddMiddleware(mid)
