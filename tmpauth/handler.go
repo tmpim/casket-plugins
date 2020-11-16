@@ -60,6 +60,12 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 		go t.janitor()
 	})
 
+	if len(t.Config.Headers) > 0 {
+		for header := range t.Config.Headers {
+			r.Header.Del(header)
+		}
+	}
+
 	statusRequested := false
 
 	if strings.HasPrefix(r.URL.Path, "/.well-known/tmpauth/") {
@@ -132,7 +138,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 			return t.startAuth(w, r)
 		}
 	} else if len(t.Config.Headers) > 0 {
-		err := t.SetHeaders(cachedToken, w.Header())
+		err := t.SetHeaders(cachedToken, r.Header)
 		if err != nil {
 			t.DebugLog("failed to set headers: %v", err)
 			return http.StatusPreconditionRequired, fmt.Errorf("tmpauth: missing required header value")
