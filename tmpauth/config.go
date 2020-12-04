@@ -77,6 +77,8 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 				cfgBlock.Debug = true
 			case "redirect":
 				cfgBlock.Redirect = args[0]
+			case "host":
+				cfgBlock.Host = args[0]
 			default:
 				headerName := strings.ToLower(val)
 				if !strings.HasPrefix(headerName, "x-") {
@@ -116,6 +118,7 @@ type configBlock struct {
 	Headers        map[string]*HeaderOption
 	ServerBlockKey string
 	Redirect       string
+	Host           string
 	Debug          bool
 }
 
@@ -183,18 +186,33 @@ func (c *configBlock) validate() (*Config, error) {
 		return nil, fmt.Errorf("tmpauth: secret cannot be empty")
 	}
 
-	if !strings.HasPrefix(c.ServerBlockKey, "http://") && !strings.HasPrefix(c.ServerBlockKey, "https://") {
-		c.ServerBlockKey = "https://" + c.ServerBlockKey
-	}
+	if c.Host != "" {
+		if !strings.HasPrefix(c.Host, "http://") && !strings.HasPrefix(c.Host, "https://") {
+			c.Host = "https://" + c.Host
+		}
 
-	u, err := url.Parse(c.ServerBlockKey)
-	if err != nil {
-		return nil, fmt.Errorf("tmpauth: failed to parse server block key: %w", err)
-	}
+		u, err := url.Parse(c.Host)
+		if err != nil {
+			return nil, fmt.Errorf("tmpauth: failed to parse host : %w", err)
+		}
 
-	u.Scheme = "https"
-	u.RawPath = ""
-	u.Path = strings.TrimSuffix(u.Path, "/")
+		u.Scheme = "https"
+		u.RawPath = ""
+		u.Path = strings.TrimSuffix(u.Path, "/")
+	} else {
+		if !strings.HasPrefix(c.ServerBlockKey, "http://") && !strings.HasPrefix(c.ServerBlockKey, "https://") {
+			c.ServerBlockKey = "https://" + c.ServerBlockKey
+		}
+
+		u, err := url.Parse(c.ServerBlockKey)
+		if err != nil {
+			return nil, fmt.Errorf("tmpauth: failed to parse server block key: %w", err)
+		}
+
+		u.Scheme = "https"
+		u.RawPath = ""
+		u.Path = strings.TrimSuffix(u.Path, "/")
+	}
 
 	return &Config{
 		PublicKey:    pubKey,

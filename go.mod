@@ -15,13 +15,16 @@ require (
 	github.com/gobuffalo/envy v1.9.0 // indirect
 	github.com/gorilla/mux v1.7.3
 	github.com/gorilla/sessions v1.2.0
+	github.com/hacdias/webdav/v3 v3.1.2
 	github.com/mailgun/mailgun-go v2.0.0+incompatible
 	github.com/opentracing/opentracing-go v1.1.0 // indirect
+	github.com/oschwald/maxminddb-golang v1.8.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.1.0
 	github.com/tidwall/gjson v1.6.1
 	github.com/tmpim/casket v1.1.0
-	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
+	golang.org/x/crypto v0.0.0-20191108234033-bd318be0434a
+	golang.org/x/net v0.0.0-20191109021931-daa7c04131f5
 	golang.org/x/time v0.0.0-20190921001708-c4c64cad1fd0
 	gopkg.in/gorethink/gorethink.v4 v4.1.0 // indirect
 )
