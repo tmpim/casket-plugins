@@ -186,12 +186,13 @@ func (c *configBlock) validate() (*Config, error) {
 		return nil, fmt.Errorf("tmpauth: secret cannot be empty")
 	}
 
+	var u *url.URL
 	if c.Host != "" {
 		if !strings.HasPrefix(c.Host, "http://") && !strings.HasPrefix(c.Host, "https://") {
 			c.Host = "https://" + c.Host
 		}
 
-		u, err := url.Parse(c.Host)
+		u, err = url.Parse(c.Host)
 		if err != nil {
 			return nil, fmt.Errorf("tmpauth: failed to parse host : %w", err)
 		}
@@ -204,7 +205,7 @@ func (c *configBlock) validate() (*Config, error) {
 			c.ServerBlockKey = "https://" + c.ServerBlockKey
 		}
 
-		u, err := url.Parse(c.ServerBlockKey)
+		u, err = url.Parse(c.ServerBlockKey)
 		if err != nil {
 			return nil, fmt.Errorf("tmpauth: failed to parse server block key: %w", err)
 		}
