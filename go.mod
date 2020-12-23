@@ -19,8 +19,7 @@ require (
 	github.com/sirupsen/logrus v1.7.0 // indirect
 	github.com/tidwall/gjson v1.6.4
 	github.com/tidwall/match v1.0.2 // indirect
-	github.com/tmpim/casket v1.1.6-beta.17.0.20201223091947-920e734085b4
-	github.com/tmpim/dnsproviders v0.4.1-0.20201223092153-105f53e4d1dc // indirect
+	github.com/tmpim/casket v1.1.6-beta.17.0.20201223092931-cf5902bdd9ff
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/net v0.0.0-20201216054612-986b41b23924
 	golang.org/x/time v0.0.0-20201208040808-7e3f01d25324
