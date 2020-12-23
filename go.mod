@@ -14,7 +14,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.9.0
 	github.com/tidwall/gjson v1.6.4
-	github.com/tmpim/casket v1.1.6-beta.17.0.20201223092931-cf5902bdd9ff
+	github.com/tmpim/casket v1.1.6-beta.18
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/net v0.0.0-20201216054612-986b41b23924
 	golang.org/x/time v0.0.0-20201208040808-7e3f01d25324
