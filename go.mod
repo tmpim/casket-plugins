@@ -10,15 +10,10 @@ require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/hacdias/webdav/v3 v3.2.0
 	github.com/mailgun/mailgun-go v2.0.0+incompatible
-	github.com/onsi/ginkgo v1.14.2 // indirect
-	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/oschwald/maxminddb-golang v1.8.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.9.0
-	github.com/rogpeppe/go-internal v1.6.2 // indirect
-	github.com/sirupsen/logrus v1.7.0 // indirect
 	github.com/tidwall/gjson v1.6.4
-	github.com/tidwall/match v1.0.2 // indirect
 	github.com/tmpim/casket v1.1.6-beta.17.0.20201223092931-cf5902bdd9ff
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 	golang.org/x/net v0.0.0-20201216054612-986b41b23924
