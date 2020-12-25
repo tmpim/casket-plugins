@@ -20,6 +20,7 @@ type CachedToken struct {
 	CachedHeaders  map[string]string
 	Expiry         time.Time
 	RevalidateAt   time.Time
+	IssuedAt       time.Time
 	UserIDs        []string // IDs that can be used in Config.AllowedUsers from IDFormats
 	headersMutex   *sync.RWMutex
 }
@@ -49,9 +50,11 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 
 	t.tokenCacheMutex.RLock()
 	cachedToken, found := t.TokenCache[tokenID]
+	minIat := t.MinimumIat
 	t.tokenCacheMutex.RUnlock()
 
-	if found && cachedToken.RevalidateAt.After(time.Now()) {
+	if found && cachedToken.RevalidateAt.After(time.Now()) &&
+		cachedToken.IssuedAt.After(minIat) {
 		// fast path, token already verified and cached in-memory
 		return cachedToken, nil
 	}
@@ -66,7 +69,7 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 
 	wToken := wTokenRaw.Claims.(*wrappedToken)
 
-	cachedToken, err = t.parseAuthJWT(wToken.Token)
+	cachedToken, err = t.parseAuthJWT(wToken.Token, minIat)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +83,7 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 	return cachedToken, nil
 }
 
-func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
+func (t *Tmpauth) parseAuthJWT(tokenStr string, minIat time.Time) (*CachedToken, error) {
 	t.DebugLog("parsing auth JWT: " + tokenStr)
 
 	token, err := jwt.Parse(tokenStr, t.VerifyWithPublicKey)
@@ -97,6 +100,9 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
 	}
 	if !mapClaims.VerifyExpiresAt(time.Now().Unix(), false) {
 		return nil, fmt.Errorf("tmpauth: token expired")
+	}
+	if !mapClaims.VerifyIssuedAt(time.Now().Unix()-300, true) {
+		return nil, fmt.Errorf("tmpauth: invalid iat, got: %v", mapClaims["iat"])
 	}
 
 	stateID, ok := mapClaims["stateID"].(string)
@@ -132,6 +138,21 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
 		expiry = time.Now().Add(3650 * 24 * time.Hour)
 	}
 
+	var iat time.Time
+	switch assertedIat := mapClaims["iat"].(type) {
+	case float64:
+		iat = time.Unix(int64(assertedIat), 0)
+	case json.Number:
+		v, _ := assertedIat.Int64()
+		iat = time.Unix(int64(v), 0)
+	default:
+		return nil, fmt.Errorf("tmpauth: iat impossibly unavailable, this is a bug: %v", mapClaims["iat"])
+	}
+
+	if !iat.After(minIat) {
+		return nil, fmt.Errorf("tmpauth: token iat before min iat")
+	}
+
 	// remarshal to ensure that json has no unnecessary whitespace.
 	descriptor, err := json.Marshal(&userDescriptor{
 		Whomst: whomstData,
@@ -151,6 +172,7 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string) (*CachedToken, error) {
 		CachedHeaders:  make(map[string]string),
 		Expiry:         expiry,
 		RevalidateAt:   revalidateAt,
+		IssuedAt:       iat,
 		StateID:        stateID,
 		headersMutex:   new(sync.RWMutex),
 	}

@@ -95,12 +95,23 @@ func (t *Tmpauth) updateMinimumIat() {
 		return
 	}
 
-	minIat := time.Unix(0, response.CacheMinIat*int64(time.Millisecond/time.Nanosecond))
+	newMinIat := time.Unix(0, response.CacheMinIat*int64(time.Millisecond/time.Nanosecond))
+
+	var prevMinIat time.Time
 
 	t.tokenCacheMutex.Lock()
-	t.MinimumIat = minIat
+	if newMinIat.After(t.MinimumIat) {
+		t.MinimumIat = newMinIat
+	} else {
+		prevMinIat = t.MinimumIat
+	}
 	t.tokenCacheMutex.Unlock()
-	t.DebugLog("minimum IAT successfully updated to %v (%v)", response.CacheMinIat, minIat)
+
+	if !prevMinIat.IsZero() {
+		t.DebugLog("new minimum IAT (%v) before previous new minimum IAT (%v), ignoring update", newMinIat, prevMinIat)
+	} else {
+		t.DebugLog("minimum IAT successfully updated to %v (%v)", response.CacheMinIat, newMinIat)
+	}
 }
 
 func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
