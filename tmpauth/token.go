@@ -101,7 +101,7 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string, minIat time.Time) (*CachedToken,
 	if !mapClaims.VerifyExpiresAt(time.Now().Unix(), false) {
 		return nil, fmt.Errorf("tmpauth: token expired")
 	}
-	if !mapClaims.VerifyIssuedAt(time.Now().Unix()-300, true) {
+	if !mapClaims.VerifyIssuedAt(time.Now().Unix()+300, true) {
 		return nil, fmt.Errorf("tmpauth: invalid iat, got: %v", mapClaims["iat"])
 	}
 
