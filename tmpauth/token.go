@@ -46,15 +46,17 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 	t.DebugLog("parsing wrapped auth JWT")
 
 	tokenID := sha256.Sum256([]byte(tokenStr))
-	t.tokenCacheMutex.Lock()
-	if cachedToken, found := t.TokenCache[tokenID]; found {
-		t.tokenCacheMutex.Unlock()
-		if cachedToken.RevalidateAt.After(time.Now()) {
-			return cachedToken, nil
-		}
-	}
-	t.tokenCacheMutex.Unlock()
 
+	t.tokenCacheMutex.RLock()
+	cachedToken, found := t.TokenCache[tokenID]
+	t.tokenCacheMutex.RUnlock()
+
+	if found && cachedToken.RevalidateAt.After(time.Now()) {
+		// fast path, token already verified and cached in-memory
+		return cachedToken, nil
+	}
+
+	// slow path, token is verified
 	wTokenRaw, err := jwt.ParseWithClaims(tokenStr, &wrappedToken{
 		clientID: t.Config.ClientID,
 	}, t.VerifyWithSecret)
@@ -64,7 +66,7 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 
 	wToken := wTokenRaw.Claims.(*wrappedToken)
 
-	cachedToken, err := t.parseAuthJWT(wToken.Token)
+	cachedToken, err = t.parseAuthJWT(wToken.Token)
 	if err != nil {
 		return nil, err
 	}

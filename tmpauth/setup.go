@@ -26,9 +26,10 @@ type Tmpauth struct {
 	TokenCache map[[32]byte]*CachedToken
 	HttpClient *http.Client
 	HMAC       hash.Hash
+	MinimumIat time.Time
 
 	stateIDCache    *cache.Cache
-	tokenCacheMutex *sync.Mutex
+	tokenCacheMutex *sync.RWMutex
 	hmacMutex       *sync.Mutex
 	janitorOnce     *sync.Once
 }
@@ -62,7 +63,7 @@ func setup(c *casket.Controller) error {
 			TokenCache:      make(map[[32]byte]*CachedToken),
 			HMAC:            hmac.New(sha1.New, config.Secret),
 			hmacMutex:       new(sync.Mutex),
-			tokenCacheMutex: new(sync.Mutex),
+			tokenCacheMutex: new(sync.RWMutex),
 			stateIDCache:    cache.New(time.Minute*5, time.Minute),
 			janitorOnce:     new(sync.Once),
 		}
