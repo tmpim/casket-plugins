@@ -3,6 +3,7 @@ module github.com/tmpim/casket-plugins
 go 1.12
 
 require (
+	github.com/caddyserver/caddy v1.0.5
 	github.com/captncraig/cors v0.0.0-20190703115713-e80254a89df1
 	github.com/dancannon/gorethink v4.0.0+incompatible
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -10,6 +11,7 @@ require (
 	github.com/gorilla/sessions v1.2.1
 	github.com/hacdias/webdav/v3 v3.2.0
 	github.com/mailgun/mailgun-go v2.0.0+incompatible
+	github.com/mmcloughlin/geohash v0.10.0
 	github.com/oschwald/maxminddb-golang v1.8.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.9.0
