@@ -33,7 +33,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/caddyserver/forwardproxy/httpclient"
+	"github.com/tmpim/casket-plugins/forwardproxy/httpclient"
 	"github.com/tmpim/casket/caskethttp/httpserver"
 )
 

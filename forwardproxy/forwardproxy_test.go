@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/caddyserver/forwardproxy/httpclient"
+	"github.com/tmpim/casket-plugins/forwardproxy/httpclient"
 	_ "github.com/tmpim/casket/caskethttp/header"
 	_ "github.com/tmpim/casket/caskethttp/httpserver"
 	_ "github.com/tmpim/casket/caskethttp/redirect"

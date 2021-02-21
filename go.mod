@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/caddyserver/caddy v1.0.5
+	github.com/caddyserver/forwardproxy v0.0.0-20201205091008-b3a96fb34dbe
 	github.com/captncraig/cors v0.0.0-20190703115713-e80254a89df1
 	github.com/dancannon/gorethink v4.0.0+incompatible
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
