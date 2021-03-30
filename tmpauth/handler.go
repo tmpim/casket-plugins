@@ -100,10 +100,10 @@ func (t *Tmpauth) updateMinimumIat() {
 	var prevMinIat time.Time
 
 	t.tokenCacheMutex.Lock()
-	if newMinIat.After(t.MinimumIat) {
-		t.MinimumIat = newMinIat
+	if newMinIat.After(t.MinValidationTime) {
+		t.MinValidationTime = newMinIat
 	} else {
-		prevMinIat = t.MinimumIat
+		prevMinIat = t.MinValidationTime
 	}
 	t.tokenCacheMutex.Unlock()
 

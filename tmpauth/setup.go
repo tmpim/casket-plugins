@@ -20,13 +20,13 @@ const (
 )
 
 type Tmpauth struct {
-	Next       httpserver.Handler
-	Config     *Config
-	Logger     *log.Logger
-	TokenCache map[[32]byte]*CachedToken
-	HttpClient *http.Client
-	HMAC       hash.Hash
-	MinimumIat time.Time
+	Next              httpserver.Handler
+	Config            *Config
+	Logger            *log.Logger
+	TokenCache        map[[32]byte]*CachedToken
+	HttpClient        *http.Client
+	HMAC              hash.Hash
+	MinValidationTime time.Time
 
 	stateIDCache    *cache.Cache
 	tokenCacheMutex *sync.RWMutex

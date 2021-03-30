@@ -20,6 +20,7 @@ type CachedToken struct {
 	CachedHeaders  map[string]string
 	Expiry         time.Time
 	RevalidateAt   time.Time
+	ValidatedAt    time.Time
 	IssuedAt       time.Time
 	UserIDs        []string // IDs that can be used in Config.AllowedUsers from IDFormats
 	headersMutex   *sync.RWMutex
@@ -50,11 +51,11 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 
 	t.tokenCacheMutex.RLock()
 	cachedToken, found := t.TokenCache[tokenID]
-	minIat := t.MinimumIat
+	minValidationTime := t.MinValidationTime
 	t.tokenCacheMutex.RUnlock()
 
 	if found && cachedToken.RevalidateAt.After(time.Now()) &&
-		cachedToken.IssuedAt.After(minIat) {
+		!cachedToken.ValidatedAt.Before(minValidationTime) {
 		// fast path, token already verified and cached in-memory
 		return cachedToken, nil
 	}
@@ -69,7 +70,7 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 
 	wToken := wTokenRaw.Claims.(*wrappedToken)
 
-	cachedToken, err = t.parseAuthJWT(wToken.Token, minIat)
+	cachedToken, err = t.parseAuthJWT(wToken.Token, minValidationTime)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 	return cachedToken, nil
 }
 
-func (t *Tmpauth) parseAuthJWT(tokenStr string, minIat time.Time) (*CachedToken, error) {
+func (t *Tmpauth) parseAuthJWT(tokenStr string, minValidationTime time.Time) (*CachedToken, error) {
 	t.DebugLog("parsing auth JWT: " + tokenStr)
 
 	token, err := jwt.Parse(tokenStr, t.VerifyWithPublicKey)
@@ -149,10 +150,6 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string, minIat time.Time) (*CachedToken,
 		return nil, fmt.Errorf("tmpauth: iat impossibly unavailable, this is a bug: %v", mapClaims["iat"])
 	}
 
-	if !iat.After(minIat) {
-		return nil, fmt.Errorf("tmpauth: token iat before min iat")
-	}
-
 	// remarshal to ensure that json has no unnecessary whitespace.
 	descriptor, err := json.Marshal(&userDescriptor{
 		Whomst: whomstData,
@@ -174,6 +171,7 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string, minIat time.Time) (*CachedToken,
 		RevalidateAt:   revalidateAt,
 		IssuedAt:       iat,
 		StateID:        stateID,
+		ValidatedAt:    minValidationTime,
 		headersMutex:   new(sync.RWMutex),
 	}
 
