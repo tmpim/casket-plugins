@@ -111,6 +111,13 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string, minValidationTime time.Time) (*C
 		return nil, fmt.Errorf("tmpauth: state ID missing from claims")
 	}
 
+	// minValidationTime = max(minValidationTime, now() - 10 min)
+	beforeValidationTime := time.Now().Add(-10 * time.Minute)
+	// if minValidationTime < now() - 10 min
+	if minValidationTime.Before(beforeValidationTime) {
+		minValidationTime = beforeValidationTime
+	}
+
 	resp, err := t.HttpClient.Get("https://" + TmpAuthHost + "/whomst/tmpauth?token=" + url.QueryEscape(tokenStr))
 	if err != nil {
 		return nil, fmt.Errorf("tmpauth: failed to retrieve whomst data: %w", err)
