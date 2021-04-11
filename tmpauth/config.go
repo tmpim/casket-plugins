@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -35,12 +34,12 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 
 	for c.Next() {
 		if found {
-			return nil, errors.New("tmpauth: only one tmpauth block can be specified for a listener")
+			return nil, c.Err("tmpauth: only one tmpauth block can be specified for a listener")
 		}
 
 		found = true
 		if len(c.RemainingArgs()) > 0 {
-			return nil, errors.New("tmpauth: tmpauth directive does not support arguments, only config blocks")
+			return nil, c.Err("tmpauth: tmpauth directive does not support arguments, only config blocks")
 		}
 
 		var cfgBlock configBlock
@@ -54,12 +53,12 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 			switch val {
 			case "public_key":
 				if len(args) == 0 {
-					return nil, fmt.Errorf("tmpauth: public_key option must have a value")
+					return nil, c.Err("tmpauth: public_key option must have a value")
 				}
 				cfgBlock.PublicKey = args[0]
 			case "secret":
 				if len(args) == 0 {
-					return nil, fmt.Errorf("tmpauth: secret option must have a value")
+					return nil, c.Err("tmpauth: secret option must have a value")
 				}
 				cfgBlock.Token = args[0]
 			case "allowed_users":
@@ -67,7 +66,7 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 			case "id_formats":
 				cfgBlock.IDFormats = args
 				if len(args) == 0 {
-					return nil, fmt.Errorf("tmpauth: id_format must have at least 1 format value")
+					return nil, c.Err("tmpauth: id_format must have at least 1 format value")
 				}
 			case "except":
 				cfgBlock.Except = args
@@ -82,11 +81,11 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 			default:
 				headerName := strings.ToLower(val)
 				if !strings.HasPrefix(headerName, "x-") {
-					return nil, fmt.Errorf("tmpauth: unknown config option (headers must start with \"X-\"): %v", val)
+					return nil, c.Errf("tmpauth: unknown config option (headers must start with \"X-\"): %v", val)
 				}
 
 				if len(args) == 0 {
-					return nil, fmt.Errorf("tmpauth: header option %q must have a format value", val)
+					return nil, c.Errf("tmpauth: header option %q must have a format value", val)
 				}
 
 				cfgBlock.Headers[headerName] = &HeaderOption{
@@ -101,7 +100,7 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 		var err error
 		config, err = cfgBlock.validate()
 		if err != nil {
-			return nil, fmt.Errorf("tmpauth: failed to parse configuration: %w", err)
+			return nil, c.Errf("tmpauth: failed to validate configuration: %w", err)
 		}
 	}
 
