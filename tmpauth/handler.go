@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/tmpim/casket/caskethttp/httpserver"
 )
 
 type StatusResponse struct {
@@ -128,7 +129,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 
 	statusRequested := false
 
-	if strings.HasPrefix(r.URL.Path, "/.well-known/tmpauth/") {
+	if httpserver.Path(r.URL.Path).Matches("/.well-known/tmpauth/") {
 		switch strings.TrimPrefix(r.URL.Path, "/.well-known/tmpauth/") {
 		case "callback":
 			return t.authCallback(w, r)
@@ -148,7 +149,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 	if path.Clean(r.URL.Path) == r.URL.Path {
 		if len(t.Config.Except) > 0 {
 			for _, exempt := range t.Config.Except {
-				if strings.HasPrefix(r.URL.Path, exempt) {
+				if httpserver.Path(r.URL.Path).Matches(exempt) {
 					authRequired = false
 					break
 				}
@@ -156,7 +157,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 		} else if len(t.Config.Include) > 0 {
 			found := false
 			for _, included := range t.Config.Include {
-				if strings.HasPrefix(r.URL.Path, included) {
+				if httpserver.Path(r.URL.Path).Matches(included) {
 					found = true
 					break
 				}

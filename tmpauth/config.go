@@ -10,6 +10,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/tmpim/casket"
+	"github.com/tmpim/casket/caskethttp/httpserver"
 )
 
 type Config struct {
@@ -95,7 +96,8 @@ func parseConfig(c *casket.Controller) (*Config, error) {
 			}
 		}
 
-		cfgBlock.ServerBlockKey = c.Key
+		blockCfg := httpserver.GetConfig(c)
+		cfgBlock.ServerBlockKey = blockCfg.Addr.String()
 
 		var err error
 		config, err = cfgBlock.validate()
