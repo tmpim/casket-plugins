@@ -20,18 +20,18 @@ const (
 )
 
 type Tmpauth struct {
-	Next              httpserver.Handler
-	Config            *Config
-	Logger            *log.Logger
-	TokenCache        map[[32]byte]*CachedToken
-	HttpClient        *http.Client
-	HMAC              hash.Hash
-	MinValidationTime time.Time
+	Next       httpserver.Handler
+	Config     *Config
+	Logger     *log.Logger
+	TokenCache map[[32]byte]*CachedToken
+	HttpClient *http.Client
+	HMAC       hash.Hash
 
 	stateIDCache    *cache.Cache
 	tokenCacheMutex *sync.RWMutex
 	hmacMutex       *sync.Mutex
 	janitorOnce     *sync.Once
+	done            chan struct{}
 }
 
 func init() {
@@ -48,6 +48,12 @@ func setup(c *casket.Controller) error {
 	}
 
 	cfg := httpserver.GetConfig(c)
+
+	if config.Debug {
+		backgroundWorker.EnableDebug()
+	}
+
+	done := make(chan struct{})
 
 	mid := func(next httpserver.Handler) httpserver.Handler {
 		return &Tmpauth{
@@ -66,9 +72,16 @@ func setup(c *casket.Controller) error {
 			tokenCacheMutex: new(sync.RWMutex),
 			stateIDCache:    cache.New(time.Minute*5, time.Minute),
 			janitorOnce:     new(sync.Once),
+			done:            done,
 		}
 	}
 	cfg.AddMiddleware(mid)
+
+	// stop background jobs on reloads/shutdowns
+	c.OnShutdown(func() error {
+		close(done)
+		return nil
+	})
 
 	return nil
 }

@@ -51,8 +51,9 @@ func (t *Tmpauth) parseWrappedAuthJWT(tokenStr string, doNotCache ...bool) (*Cac
 
 	t.tokenCacheMutex.RLock()
 	cachedToken, found := t.TokenCache[tokenID]
-	minValidationTime := t.MinValidationTime
 	t.tokenCacheMutex.RUnlock()
+
+	minValidationTime := backgroundWorker.MinValidationTime()
 
 	if found && cachedToken.RevalidateAt.After(time.Now()) &&
 		!cachedToken.ValidatedAt.Before(minValidationTime) {

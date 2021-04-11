@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
-	"runtime/debug"
 	"strings"
 	"time"
 
@@ -43,82 +41,36 @@ func (t *Tmpauth) serveStatus(w http.ResponseWriter, r *http.Request, token *Cac
 }
 
 func (t *Tmpauth) janitor() {
+	t.DebugLog("token cache janitor started")
+
 	ticker := time.NewTicker(5 * time.Minute)
-	for range ticker.C {
-		t.tokenCacheMutex.Lock()
+	for {
+		select {
+		case <-t.done:
+			t.DebugLog("stopping token cache janitor")
+			ticker.Stop()
+			return
+		case <-ticker.C:
+			t.DebugLog("running token cache janitor")
 
-		now := time.Now()
-		for k, v := range t.TokenCache {
-			if now.After(v.RevalidateAt) {
-				delete(t.TokenCache, k)
+			t.tokenCacheMutex.Lock()
+
+			now := time.Now()
+			for k, v := range t.TokenCache {
+				if now.After(v.RevalidateAt) {
+					delete(t.TokenCache, k)
+				}
 			}
+
+			t.tokenCacheMutex.Unlock()
 		}
-
-		t.tokenCacheMutex.Unlock()
-	}
-}
-
-func (t *Tmpauth) minimumIatWorker() {
-	ticker := time.NewTicker(10 * time.Second)
-	for range ticker.C {
-		t.updateMinimumIat()
-	}
-}
-
-func (t *Tmpauth) updateMinimumIat() {
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Fprintf(os.Stderr, "tmpauth panic: updateMinimumIat: %v\n%s",
-				r, string(debug.Stack()))
-		}
-	}()
-	t.DebugLog("updating minimum IAT")
-
-	resp, err := http.Get("https://" + TmpAuthHost + "/tmpauth/cache")
-	if err != nil {
-		t.DebugLog("failed to get /tmpauth/cache: %v", err)
-		return
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.DebugLog("failed to get/tmpauth/cache: response not OK: %v", resp.Status)
-		return
-	}
-
-	var response struct {
-		CacheMinIat int64 `json:"cacheMinIat"`
-	}
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		t.DebugLog("failed to parse /tmpauth/cache response: %v", err)
-		return
-	}
-
-	newMinIat := time.Unix(0, response.CacheMinIat*int64(time.Millisecond/time.Nanosecond))
-
-	var prevMinIat time.Time
-
-	t.tokenCacheMutex.Lock()
-	if newMinIat.After(t.MinValidationTime) {
-		t.MinValidationTime = newMinIat
-	} else {
-		prevMinIat = t.MinValidationTime
-	}
-	t.tokenCacheMutex.Unlock()
-
-	if !prevMinIat.IsZero() {
-		t.DebugLog("new minimum IAT (%v) before previous new minimum IAT (%v), ignoring update", newMinIat, prevMinIat)
-	} else {
-		t.DebugLog("minimum IAT successfully updated to %v (%v)", response.CacheMinIat, newMinIat)
 	}
 }
 
 func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
 	t.janitorOnce.Do(func() {
 		go t.janitor()
-		go t.minimumIatWorker()
+		backgroundWorker.Start()
 	})
 
 	if len(t.Config.Headers) > 0 {

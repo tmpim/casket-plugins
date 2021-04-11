@@ -79,11 +79,7 @@ func (t *Tmpauth) authCallback(w http.ResponseWriter, r *http.Request) (int, err
 		})
 	}
 
-	t.tokenCacheMutex.RLock()
-	minValidationTime := t.MinValidationTime
-	t.tokenCacheMutex.RUnlock()
-
-	token, err := t.parseAuthJWT(tokenStr, minValidationTime)
+	token, err := t.parseAuthJWT(tokenStr, backgroundWorker.MinValidationTime())
 	if err != nil {
 		t.DebugLog("failed to verify callback token: %v", err)
 		return t.failRedirect(w, r, ErrInvalidCallbackToken)
