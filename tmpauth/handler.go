@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -80,6 +81,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 	}
 
 	statusRequested := false
+	whomstRequested := false
 
 	if httpserver.Path(r.URL.Path).Matches("/.well-known/tmpauth/") {
 		switch strings.TrimPrefix(r.URL.Path, "/.well-known/tmpauth/") {
@@ -87,6 +89,9 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 			return t.authCallback(w, r)
 		case "status":
 			statusRequested = true
+			break
+		case "whomst":
+			whomstRequested = true
 			break
 		default:
 			return http.StatusBadRequest, fmt.Errorf("tmpauth: no such path")
@@ -125,7 +130,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 
 	t.DebugLog("auth requirement for %q: %v", r.URL.Path, authRequired)
 
-	cachedToken, err := t.authFromCookie(r)
+	cachedToken, tokenStr, err := t.authFromCookie(r)
 	if err != nil {
 		t.DebugLog("failed to get JWT token: %v", err)
 
@@ -143,10 +148,14 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 			})
 		}
 
+		// Not authed, return an empty status or whomst response if requested
 		if statusRequested {
 			return t.serveStatus(w, r, nil)
+		} else if whomstRequested {
+			return t.serveWhomst(w, "")
 		}
 
+		// Begin auth flow
 		if authRequired {
 			return t.startAuth(w, r)
 		}
@@ -158,6 +167,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 		}
 	}
 
+	// Token is available (authenticated, but not necessarily allowed), serve the status response if requested
 	if statusRequested {
 		return t.serveStatus(w, r, cachedToken)
 	}
@@ -183,6 +193,11 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 	if !userAuthorized {
 		t.DebugLog("user not on allowed users list")
 		return http.StatusForbidden, fmt.Errorf("tmpauth: user not in allowed list")
+	}
+
+	// Now serve the whomst response if requested (authenticated and authorized)
+	if whomstRequested {
+		return t.serveWhomst(w, tokenStr)
 	}
 
 	return t.Next.ServeHTTP(w, r)
@@ -248,16 +263,63 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 	return 0, nil
 }
 
-func (t *Tmpauth) authFromCookie(r *http.Request) (*CachedToken, error) {
+// authFromCookie attempts to get the auth token from the cookie or the X-Tmpauth-Token header, and returns the
+// cachedToken (if it was successfully parsed), the token string (if it existed), and any error.
+func (t *Tmpauth) authFromCookie(r *http.Request) (*CachedToken, string, error) {
 	token := r.Header.Get("X-Tmpauth-Token")
 	if token != "" {
-		return t.parseWrappedAuthJWT(token)
+		cachedToken, err := t.parseWrappedAuthJWT(token)
+		return cachedToken, token, err
 	}
 
 	cookie, err := r.Cookie(t.CookieName())
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return t.parseWrappedAuthJWT(cookie.Value)
+	cachedToken, err := t.parseWrappedAuthJWT(cookie.Value)
+	return cachedToken, cookie.Value, err
+}
+
+type WhomstResponse struct {
+	Whomst json.RawMessage `json:"whomst"`
+}
+
+// serveWhomst returns the entire whomst database if the user is logged in.
+func (t *Tmpauth) serveWhomst(w http.ResponseWriter, tokenStr string) (int, error) {
+	// If the user is not logged in, return an error
+	if tokenStr == "" {
+		return http.StatusUnauthorized, fmt.Errorf("tmpauth: must be logged in to retrieve whomst database")
+	}
+
+	// Fetch the inner token from the wrapped token (slow)
+	wTokenRaw, err := jwt.ParseWithClaims(tokenStr, &wrappedToken{
+		clientID: t.Config.ClientID,
+	}, t.VerifyWithSecret)
+	if err != nil {
+		return http.StatusUnauthorized, fmt.Errorf("tmpauth: failed to parse wrapped token: %w", err)
+	}
+
+	wToken := wTokenRaw.Claims.(*wrappedToken)
+
+	// Fetch the whomst database from tmpauth using the user's token
+	resp, err := t.HttpClient.Get("https://" + TmpAuthHost + "/whomst/tmpauth/db?token=" + url.QueryEscape(wToken.Token))
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("tmpauth: failed to create request: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return http.StatusInternalServerError, fmt.Errorf("tmpauth: got non OK response when retrieving whomst database: %v", resp.Status)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	_, err = io.Copy(w, resp.Body)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("tmpauth: failed to write response: %w", err)
+	}
+
+	return 0, nil
 }
