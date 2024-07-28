@@ -16,6 +16,7 @@ import (
 
 type CachedToken struct {
 	StateID        string
+	RawToken       string
 	UserDescriptor string
 	CachedHeaders  map[string]string
 	Expiry         time.Time
@@ -174,6 +175,7 @@ func (t *Tmpauth) parseAuthJWT(tokenStr string, minValidationTime time.Time) (*C
 
 	cachedToken := &CachedToken{
 		UserDescriptor: string(descriptor),
+		RawToken:       tokenStr,
 		CachedHeaders:  make(map[string]string),
 		Expiry:         expiry,
 		RevalidateAt:   revalidateAt,

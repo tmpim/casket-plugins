@@ -130,7 +130,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 
 	t.DebugLog("auth requirement for %q: %v", r.URL.Path, authRequired)
 
-	cachedToken, tokenStr, err := t.authFromCookie(r)
+	cachedToken, err := t.authFromCookie(r)
 	if err != nil {
 		t.DebugLog("failed to get JWT token: %v", err)
 
@@ -152,7 +152,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 		if statusRequested {
 			return t.serveStatus(w, r, nil)
 		} else if whomstRequested {
-			return t.serveWhomst(w, "")
+			return t.serveWhomst(w, nil)
 		}
 
 		// Begin auth flow
@@ -197,7 +197,7 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 
 	// Now serve the whomst response if requested (authenticated and authorized)
 	if whomstRequested {
-		return t.serveWhomst(w, tokenStr)
+		return t.serveWhomst(w, cachedToken)
 	}
 
 	return t.Next.ServeHTTP(w, r)
@@ -264,21 +264,19 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 }
 
 // authFromCookie attempts to get the auth token from the cookie or the X-Tmpauth-Token header, and returns the
-// cachedToken (if it was successfully parsed), the token string (if it existed), and any error.
-func (t *Tmpauth) authFromCookie(r *http.Request) (*CachedToken, string, error) {
+// cachedToken (if it was successfully parsed), and any error.
+func (t *Tmpauth) authFromCookie(r *http.Request) (*CachedToken, error) {
 	token := r.Header.Get("X-Tmpauth-Token")
 	if token != "" {
-		cachedToken, err := t.parseWrappedAuthJWT(token)
-		return cachedToken, token, err
+		return t.parseWrappedAuthJWT(token)
 	}
 
 	cookie, err := r.Cookie(t.CookieName())
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	cachedToken, err := t.parseWrappedAuthJWT(cookie.Value)
-	return cachedToken, cookie.Value, err
+	return t.parseWrappedAuthJWT(cookie.Value)
 }
 
 type WhomstResponse struct {
@@ -286,24 +284,14 @@ type WhomstResponse struct {
 }
 
 // serveWhomst returns the entire whomst database if the user is logged in.
-func (t *Tmpauth) serveWhomst(w http.ResponseWriter, tokenStr string) (int, error) {
+func (t *Tmpauth) serveWhomst(w http.ResponseWriter, token *CachedToken) (int, error) {
 	// If the user is not logged in, return an error
-	if tokenStr == "" {
+	if token == nil {
 		return http.StatusUnauthorized, fmt.Errorf("tmpauth: must be logged in to retrieve whomst database")
 	}
 
-	// Fetch the inner token from the wrapped token (slow)
-	wTokenRaw, err := jwt.ParseWithClaims(tokenStr, &wrappedToken{
-		clientID: t.Config.ClientID,
-	}, t.VerifyWithSecret)
-	if err != nil {
-		return http.StatusUnauthorized, fmt.Errorf("tmpauth: failed to parse wrapped token: %w", err)
-	}
-
-	wToken := wTokenRaw.Claims.(*wrappedToken)
-
 	// Fetch the whomst database from tmpauth using the user's token
-	resp, err := t.HttpClient.Get("https://" + TmpAuthHost + "/whomst/tmpauth/db?token=" + url.QueryEscape(wToken.Token))
+	resp, err := t.HttpClient.Get("https://" + TmpAuthHost + "/whomst/tmpauth/db?token=" + url.QueryEscape(token.RawToken))
 	if err != nil {
 		return http.StatusInternalServerError, fmt.Errorf("tmpauth: failed to create request: %w", err)
 	}
