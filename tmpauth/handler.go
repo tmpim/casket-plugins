@@ -225,6 +225,9 @@ func (t *Tmpauth) startAuth(w http.ResponseWriter, r *http.Request) (int, error)
 	}
 
 	requestURI := r.URL.RequestURI()
+	if requestURI[0] != '/' {
+		requestURI = "/" + requestURI
+	}
 
 	t.stateIDCache.SetDefault(tokenID, requestURI)
 
