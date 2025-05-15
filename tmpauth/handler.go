@@ -172,27 +172,29 @@ func (t *Tmpauth) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error)
 		return t.serveStatus(w, r, cachedToken)
 	}
 
-	userAuthorized := false
-	if len(t.Config.AllowedUsers) > 0 {
-		t.DebugLog("checking if user is allowed on allowed users list: %v", cachedToken.UserIDs)
-		userIDs := make(map[string]bool)
-		for _, userID := range cachedToken.UserIDs {
-			userIDs[userID] = true
-		}
-
-		for _, allowedUser := range t.Config.AllowedUsers {
-			if userIDs[allowedUser] {
-				userAuthorized = true
-				break
+	if authRequired {
+		userAuthorized := false
+		if len(t.Config.AllowedUsers) > 0 {
+			t.DebugLog("checking if user is allowed on allowed users list: %v", cachedToken.UserIDs)
+			userIDs := make(map[string]bool)
+			for _, userID := range cachedToken.UserIDs {
+				userIDs[userID] = true
 			}
-		}
-	} else {
-		userAuthorized = true
-	}
 
-	if !userAuthorized {
-		t.DebugLog("user not on allowed users list")
-		return http.StatusForbidden, fmt.Errorf("tmpauth: user not in allowed list")
+			for _, allowedUser := range t.Config.AllowedUsers {
+				if userIDs[allowedUser] {
+					userAuthorized = true
+					break
+				}
+			}
+		} else {
+			userAuthorized = true
+		}
+
+		if !userAuthorized {
+			t.DebugLog("user not on allowed users list")
+			return http.StatusForbidden, fmt.Errorf("tmpauth: user not in allowed list")
+		}
 	}
 
 	// Now serve the whomst response if requested (authenticated and authorized)
