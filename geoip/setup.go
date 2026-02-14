@@ -5,12 +5,22 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mmcloughlin/geohash"
 	"github.com/tmpim/casket"
 	"github.com/tmpim/casket/caskethttp/httpserver"
+)
+
+var (
+	// reloaderCache maps absolute database paths to shared DBReloader instances.
+	// This prevents opening the same database file multiple times when multiple
+	// server blocks use the same geoip database.
+	reloaderCache   = make(map[string]*DBReloader)
+	reloaderCacheMu sync.Mutex
 )
 
 // GeoIP represents a middleware instance
@@ -54,15 +64,35 @@ func setup(c *casket.Controller) error {
 		return err
 	}
 
-	reloader, err := NewDBReloader(config.DatabasePath)
+	// Get absolute path to use as cache key
+	absPath, err := filepath.Abs(config.DatabasePath)
 	if err != nil {
-		return c.Err("geoip: Can't open database: " + config.DatabasePath)
+		return c.Errf("geoip: Can't resolve database path %s: %v", config.DatabasePath, err)
 	}
 
-	// Ensure the reloader is closed when the server shuts down.
-	c.OnShutdown(func() error {
-		return reloader.Close()
-	})
+	// Get or create a shared DBReloader for this database path
+	reloaderCacheMu.Lock()
+	reloader, exists := reloaderCache[absPath]
+	if !exists {
+		reloader, err = NewDBReloader(config.DatabasePath)
+		if err != nil {
+			reloaderCacheMu.Unlock()
+			return c.Errf("geoip: Can't open database %s: %v", config.DatabasePath, err)
+		}
+		reloaderCache[absPath] = reloader
+
+		// Only register cleanup for newly created reloaders.
+		// Clean up on shutdown and remove from cache.
+		cleanup := func() error {
+			reloaderCacheMu.Lock()
+			delete(reloaderCache, absPath)
+			reloaderCacheMu.Unlock()
+			return reloader.Close()
+		}
+		c.OnShutdown(cleanup)
+		c.OnRestart(cleanup)
+	}
+	reloaderCacheMu.Unlock()
 
 	// Create new middleware
 	newMiddleWare := func(next httpserver.Handler) httpserver.Handler {
