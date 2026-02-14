@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/tmpim/casket/caskethttp/httpserver"
-	maxminddb "github.com/oschwald/maxminddb-golang"
 )
 
 type testResponseRecorder struct {
@@ -17,10 +16,11 @@ type testResponseRecorder struct {
 func (testResponseRecorder) CloseNotify() <-chan bool { return nil }
 
 func TestReplacers(t *testing.T) {
-	dbhandler, err := maxminddb.Open("./test-data/GeoLite2-City.mmdb")
+	reloader, err := newDBReloader("./test-data/GeoLite2-City.mmdb", defaultDebounce, nil)
 	if err != nil {
-		t.Errorf("geoip: Can't open database: GeoLite2-City.mmdb")
+		t.Fatalf("geoip: Can't open database: %v", err)
 	}
+	defer reloader.Close()
 
 	config := Config{}
 
@@ -28,8 +28,8 @@ func TestReplacers(t *testing.T) {
 		Next: httpserver.HandlerFunc(func(w http.ResponseWriter, r *http.Request) (int, error) {
 			return 0, nil
 		}),
-		DBHandler: dbhandler,
-		Config:    config,
+		Reloader: reloader,
+		Config:   config,
 	}
 
 	r := httptest.NewRequest("GET", "/", strings.NewReader(""))

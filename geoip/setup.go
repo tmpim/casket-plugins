@@ -8,17 +8,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mmcloughlin/geohash"
 	"github.com/tmpim/casket"
 	"github.com/tmpim/casket/caskethttp/httpserver"
-	"github.com/mmcloughlin/geohash"
-	"github.com/oschwald/maxminddb-golang"
 )
 
 // GeoIP represents a middleware instance
 type GeoIP struct {
-	Next      httpserver.Handler
-	DBHandler *maxminddb.Reader
-	Config    Config
+	Next     httpserver.Handler
+	Reloader *DBReloader
+	Config   Config
 }
 
 type GeoIPRecord struct {
@@ -55,16 +54,22 @@ func setup(c *casket.Controller) error {
 		return err
 	}
 
-	dbhandler, err := maxminddb.Open(config.DatabasePath)
+	reloader, err := NewDBReloader(config.DatabasePath)
 	if err != nil {
 		return c.Err("geoip: Can't open database: " + config.DatabasePath)
 	}
+
+	// Ensure the reloader is closed when the server shuts down.
+	c.OnShutdown(func() error {
+		return reloader.Close()
+	})
+
 	// Create new middleware
 	newMiddleWare := func(next httpserver.Handler) httpserver.Handler {
 		return &GeoIP{
-			Next:      next,
-			DBHandler: dbhandler,
-			Config:    config,
+			Next:     next,
+			Reloader: reloader,
+			Config:   config,
 		}
 	}
 	// Add middleware
@@ -103,7 +108,7 @@ func (gip GeoIP) fetchGeoipData(r *http.Request) GeoIPRecord {
 	clientIP, _ := getClientIP(r, true)
 
 	var record = GeoIPRecord{}
-	err := gip.DBHandler.Lookup(clientIP, &record)
+	err := gip.Reloader.Lookup(clientIP, &record)
 	if err != nil {
 		log.Println(err)
 	}
