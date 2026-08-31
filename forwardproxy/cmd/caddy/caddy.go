@@ -6,6 +6,5 @@ import (
 )
 
 func main() {
-	casketmain.EnableTelemetry = false
 	casketmain.Run()
 }
